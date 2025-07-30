@@ -1,0 +1,2105 @@
+rm(list = ls())
+options(warn=1)
+
+#####CARGAR LIBRERÍAS############
+
+if (!require('tidyverse')) install.packages('tidyverse'); library('tidyverse')
+if (!require('factoextra')) install.packages('factoextra'); library('factoextra')
+if (!require('tidyverse')) install.packages('tidyverse'); library('tidyverse')
+if (!require('foreign')) install.packages('foreign'); library('foreign')
+if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
+if (!require('survey')) install.packages('survey'); library('survey')
+if (!require('corrplot')) install.packages('corrplot'); library('corrplot')
+if (!require('gtsummary')) install.packages('gtsummary'); library('gtsummary')
+if (!require('summarytools')) install.packages('summarytools'); library('summarytools')
+if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
+if (!require('ggsurvey')) install.packages('ggsurvey'); library('ggsurvey')
+if (!require('questionr')) install.packages('questionr'); library('questionr')
+if (!require('scales')) install.packages('scales'); library('scales')
+if (!require('ggpubr')) install.packages('ggpubr'); library('ggpubr')
+
+
+
+
+#Leer R.DATA de la ENSU 03/23#
+load("G:/Mi unidad/Iztapalapa/Encuestas/ENSU/03_23/BD_ENSU_0323.RData")
+
+
+##Aplicar diseño muestral##
+
+CB_3_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0323, nest = T)
+
+per_seg<-svymean(~factor(BP1_1) , design = CB_3_23)
+per_seg
+
+
+confint(per_seg, level = 0.9)
+
+#Coincide exactamente con tabulados INEGI#
+
+
+cdmx_seg<-subset(CB_3_23,  CVE_ENT == "09")
+
+#Percepción seguridad CDMX#
+
+svymean(~factor(BP1_1), design = cdmx_seg)
+
+
+#Percepción seguridad IZTAPALAPA sin diseño muestral#
+
+
+freq(ENSU_CB_0323[ENSU_CB_0323$CD=="76",]$BP1_1)
+
+
+#Percepción seguridad Iztapalapa con ponderador#
+freq(ENSU_CB_0323[ENSU_CB_0323$CD=="76"& ENSU_CB_0323$CD < 97,]$BP1_1,
+     weights = ENSU_CB_0323[ENSU_CB_0323$CD=="76"& ENSU_CB_0323$CD < 98,]$FAC_SEL)
+
+freq(ENSU_CB_0323[ENSU_CB_0323$CD=="76"& ENSU_CB_0323$CD < 97,]$BP1_1)
+
+
+#Otro diseño
+DIS_2<-svydesign(ids = ~UPM, strata = ~EST, weights = ~FAC_SEL, data =ENSU_CB_0323, nest = T)
+
+summary(DIS_2)
+
+svymean(~factor(BP1_1), design = subset(DIS_2,CD=="76" & ENSU_CB_0323$CD < 98))
+
+
+
+
+#Replicar dato reportado en la tabla de resultados#
+
+
+
+
+
+#Percepción seguridad Iztapalapa con diseño muestral#
+
+svymean(~factor(BP1_1) , design = subset(CB_3_23, CD == "76"))
+
+
+
+###Confianza Gobiernos###
+
+#Recodificar variables de confianza en rangos#
+
+ENSU_CB_0323 <- ENSU_CB_0323 %>% mutate(
+  conf_pres = case_when(BP4_1_1 == "00" | BP4_1_1 == "01" | BP4_1_1 == "02" | BP4_1_1 == "03" ~ "No confía nada",
+                        BP4_1_1 == "04" | BP4_1_1 == "05" ~ "No confía",
+                        BP4_1_1 == "06" | BP4_1_1 == "07" ~ "Confía",
+                        BP4_1_1 == "08" | BP4_1_1 == "09" | BP4_1_1 == "10" ~ "Confía mucho",
+                        BP4_1_1 == "99" ~ NA),
+  conf_gob = case_when(BP4_1_2 == "00" | BP4_1_2 == "01" | BP4_1_2 == "02" | BP4_1_2 == "03" ~ "No confía nada",
+                       BP4_1_2 == "04" | BP4_1_2 == "05" ~ "No confía",
+                       BP4_1_2 == "06" | BP4_1_2 == "07" ~ "Confía",
+                       BP4_1_2 == "08" | BP4_1_2 == "09" | BP4_1_2 == "10" ~ "Confía mucho",
+                       BP4_1_2 == "99" ~ NA), 
+  conf_alc = case_when(BP4_1_3 == "00" | BP4_1_3 == "01" | BP4_1_3 == "02" | BP4_1_3 == "03" ~ "No confía nada",
+                       BP4_1_3 == "04" | BP4_1_3 == "05" ~ "No confía",
+                       BP4_1_3 == "06" | BP4_1_3 == "07" ~ "Confía",
+                       BP4_1_3 == "08" | BP4_1_3 == "09" | BP4_1_3 == "10" ~ "Confía mucho",
+                       BP4_1_3 == "99" ~ NA)
+)%>%
+  mutate(conf_pres = factor(conf_pres, levels = c("Confía mucho", "Confía", "No confía", "No confía nada")))%>%
+  mutate(conf_gob = factor(conf_gob, levels = c("Confía mucho", "Confía", "No confía", "No confía nada")))%>%
+  mutate(conf_alc = factor(conf_alc, levels = c("Confía mucho", "Confía", "No confía", "No confía nada")))
+  
+#Vuelvo a correr el diseño muestral#
+
+
+(ENSU_CB_0323$conf_pres)
+
+CB_3_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0323, nest = T)
+
+
+
+svyby(~factor(conf_pres), by= ~NOM_ENT, design = CB_3_23, na.rm.all = T, svymean)
+
+
+resumen<- CB_3_23 %>%
+  tbl_svysummary(by=NOM_ENT, include = c(conf_pres, conf_gob, conf_alc), digits =~1)
+resumen
+
+#RESUMEN IZTAPALAPA#
+
+resumen_IZ<- subset(CB_3_23, CD=="76") %>%
+  tbl_svysummary(include = c(conf_pres, conf_gob, conf_alc), digits =~1, statistic = all_categorical() ~ "{p}%")
+resumen_IZ
+
+
+#RRESUMEN ALCALDÍAS
+table(ENSU_CB_0323$NOM_ENT)
+
+
+resumen_alc<- subset(CB_3_23, NOM_ENT == "CIUDAD DE MEXICO") %>%
+  tbl_svysummary(by= NOM_CD, include = c(conf_pres, conf_gob, conf_alc), digits =~1, statistic = all_categorical() ~ "{p}%")
+resumen_alc
+
+#Grafico
+ENSU_CB_0323<- ENSU_CB_0323 %>% mutate(
+  nom_cdmx = case_when(NOM_CD =="ALVARO OBREGON" ~ "AO",
+                       NOM_CD =="AZCAPOTZALCO" ~ "AZC",
+                       NOM_CD =="BENITO JUAREZ" ~ "BJ",
+                       NOM_CD =="COYOACAN" ~ "COY",
+                       NOM_CD =="CUAJIMALPA DE MORELOS" ~ "CUAJ",
+                       NOM_CD =="CUAUHTEMOC" ~ "CUAHM",
+                       NOM_CD =="GUSTAVO A. MADERO" ~ "GM",
+                       NOM_CD =="IZTACALCO" ~ "IZC",
+                       NOM_CD =="IZTAPALAPA" ~ "IZP",
+                       NOM_CD =="LA MAGDALENA CONTRERAS" ~ "LMC",
+                       NOM_CD =="MIGUEL HIDALGO" ~ "MH",
+                       NOM_CD =="MILPA ALTA" ~ "MA",
+                       NOM_CD =="TLAHUAC" ~ "TLH",
+                       NOM_CD =="TLALPAN" ~ "TLP",
+                       NOM_CD =="VENUSTIANO CARRANZA" ~ "VC",
+                       NOM_CD =="XOCHIMILCO" ~ "XOCH",
+                       TRUE ~ NA))
+
+table(ENSU_CB_0323[ENSU_CB_0323$NOM_ENT == "CIUDAD DE MEXICO",]$nom_cdmx)
+
+CB_3_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0323, nest = T)
+
+str(ENSU_CB_0323$nom_cdmx)
+
+g1<- ggsurvey(subset(CB_3_23,  NOM_ENT == "CIUDAD DE MEXICO" & !is.na(conf_pres))) +  
+  aes(x = reorder(nom_cdmx, -as.numeric(BP4_1_1)), fill= conf_pres, weight = FAC_SEL)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+                                                                                                                               stat = "count",
+                                                                                                                               position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom") + ggtitle("Confianza en el Presidente Andrés Manuel López Obrador en CDMX por demarcación")
+
+g1
+
+
+
+
+g2<- ggsurvey(subset(CB_3_23,  NOM_ENT == "CIUDAD DE MEXICO" & !is.na(conf_gob))) +  
+  aes(x = reorder(nom_cdmx, -as.numeric(BP4_1_2)), fill= conf_gob, weight = FAC_SEL)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+                                                                                                                                                                stat = "count",
+                                                                                                                                                                position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Confianza en la Jefa de Gobierno Claudia Sheinbaum en CDMX por demarcación")
+
+g2
+
+table(ENSU_CB_0323$BP4_1_2, ENSU_CB_0323$conf_gob)
+
+
+g3<- ggsurvey(subset(CB_3_23,  NOM_ENT == "CIUDAD DE MEXICO" & !is.na(conf_alc))) +  
+  aes(x = reorder(nom_cdmx, -as.numeric(BP4_1_3)), fill= conf_alc, weight = FAC_SEL)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+                                                                                                                                                               stat = "count",
+                                                                                                                                                               position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Confianza en alcaldes y alcaldesas de la CDMX por demarcación
+                                                                  ")
+
+g3
+
+ENSU_CB_0323<- ENSU_CB_0323 %>%mutate(
+  BP1_1 = recode(BP1_1, 
+                 `1` = "Seguro",
+                 `2` = "Inseguro",
+                 `9` = NA_character_))
+
+summarytools::freq(ENSU_CB_0323$BP1_1, order = "freq")
+
+ENSU_CB_0323 <- ENSU_CB_0323 %>% mutate( 
+  nom_cdmx = factor(nom_cdmx, levels = c("TLH", "IZP", "IZC", "XOCH", "GM", 
+                                         "MA", "GUAHM", "AZC", "AO" , "LMC",
+                                         "TLP","COY", "MH", "VC", "CUAJ", "BJ"))
+)
+
+
+CB_3_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0323, nest = T)
+
+g4<- ggsurvey(subset(CB_3_23,  NOM_ENT == "CIUDAD DE MEXICO" & !is.na(nom_cdmx))) +  
+  aes(x = nom_cdmx, fill= BP1_1, weight = FAC_SEL)+ geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en CDMX por demarcación")
+
+g4
+
+ggsurvey(subset(CB_3_23,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx, fill= BP1_1, weight = FAC_SEL)+ geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en CDMX por demarcación")
+
+
+
+
++
+  facet_grid(~SEXO, margins = TRUE)
+g1
+
++ facet_grid(~niv_ed2, margins = TRUE, labeller = as_labeller(nombres_grupos1))+
+  
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+            stat = "count",
+            position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")
+
+
+
+g1<- ggsurvey(subset(dm21, estudiante == "Estudiante sistema regular")) +  
+  aes(x = s01a_02, fill= uso_tic1, weight = factor)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+ facet_grid(~niv_ed2, margins = TRUE, labeller = as_labeller(nombres_grupos1))+
+  
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+            stat = "count",
+            position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")
+
+
+
+freq(ENSU_CB_0323$conf_pres)
+
+str(ENSU_CB_0323$conf_pres)
+
+
+
+freq(ENSU_CB_0323$conf_pres, weights = ENSU_CB_0323$FAC_SEL)
+
+
+
+##Mexico##
+
+#Presidente
+freq(ENSU_CB_0323$BP4_1_1)
+
+#
+
+svymean(~BP4_1_1, design = CB_3_23)
+
+
+
+dput(subset(ENSU_CB_0323, NOM_ENT == "CIUDAD DE MEXICO")(df, 50))
+
+
+
+
+####MODELO######
+
+
+#Latentes
+#Casa
+summarytools::freq(ENSU_CB_0323$BP1_2_01)
+
+#Trabajo
+summarytools::freq(ENSU_CB_0323$BP1_2_02)
+
+#Calles que usa
+summarytools::freq(ENSU_CB_0323$BP1_2_03)
+
+#Parque recreativo o centro recreativo
+
+summarytools::freq(ENSU_CB_0323$BP1_2_12)
+
+#Incivilidad
+
+summarytools::freq(ENSU_CB_0323$BP1_4_1)
+
+BP1_4_2
+
+BP1_4_3
+
+BP1_4_4
+
+BP1_4_5
+
+BP1_4_6
+
+BP1_4_7
+
+BP1_4_8
+
+na_if()
+
+###Quitar NA
+ENSU_CB_0323$BP1_1<- na_if(ENSU_CB_0323$BP1_1, "9")
+
+ENSU_CB_0323$BP1_2_01<-na_if(ENSU_CB_0323$BP1_2_01, "9")
+
+ENSU_CB_0323$BP1_2_02<-na_if(ENSU_CB_0323$BP1_2_02, "9")
+
+ENSU_CB_0323$BP1_2_03<-na_if(ENSU_CB_0323$BP1_2_03, "9")
+
+ENSU_CB_0323$BP1_4_1<-na_if(ENSU_CB_0323$BP1_4_1, "9")
+
+ENSU_CB_0323$BP1_4_2<-na_if(ENSU_CB_0323$BP1_4_2, "9")
+
+ENSU_CB_0323$BP1_4_3<-na_if(ENSU_CB_0323$BP1_4_3, "9")
+
+ENSU_CB_0323$BP1_4_4<-na_if(ENSU_CB_0323$BP1_4_4, "9")
+
+ENSU_CB_0323$BP1_4_5<-na_if(ENSU_CB_0323$BP1_4_5, "9")
+
+ENSU_CB_0323$BP1_4_6<-na_if(ENSU_CB_0323$BP1_4_6, "9")
+
+ENSU_CB_0323$BP1_4_7<-na_if(ENSU_CB_0323$BP1_4_7, "9")
+
+ENSU_CB_0323$BP1_4_8<-na_if(ENSU_CB_0323$BP1_4_8, "9")
+
+
+
+
+
+summarytools::freq(ENSU_CB_0323$BP1_2_01)
+
+summarytools::freq(ENSU_CB_0323$BP1_1)
+
+ENSU_CB_0323<- ENSU_CB_0323 %>% mutate(
+  seg=case_when(BP1_1 == "1" ~ 1,
+                BP1_1 == "2" ~ 0,
+                TRUE ~ NA_real_)
+)
+
+
+#Sexo
+
+summarytools::freq(ENSU_CB_0323$SEXO)
+
+summary(glm(seg ~ BP1_2_01+ BP1_2_02 + BP1_2_03 + BP1_4_1 + BP1_4_2 +
+      BP1_4_3+ BP1_4_4+ BP1_4_5+ BP1_4_6 + BP1_4_7 + BP1_4_8 +
+      SEXO, data = ENSU_CB_0323, family = quasibinomial(link = "logit")))
+
+?glm
+
+
+####ENSU 2T 2023####
+
+
+
+#Leer R.DATA de la ENSU 06/23#
+load("G:/Mi unidad/Iztapalapa/Encuestas/ENSU/06_23/BD_ENSU_0623.RData")
+
+
+##Aplicar diseño muestral##
+
+
+CB_6_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0623, nest = T)
+
+per_seg<-svymean(~factor(BP1_1) , design = CB_6_23)
+per_seg
+
+
+confint(per_seg, level = 0.9)
+
+#Coincide exactamente con tabulados INEGI#
+
+
+cdmx_seg<-subset(CB_6_23,  CVE_ENT == "09")
+
+#Percepción seguridad CDMX#
+
+svymean(~factor(BP1_1), design = cdmx_seg)
+
+
+#Percepción seguridad IZTAPALAPA sin diseño muestral#
+
+
+freq(ENSU_CB_0623[ENSU_CB_0623$CD=="76",]$BP1_1)
+
+
+#Percepción seguridad Iztapalapa con ponderador#
+freq(ENSU_CB_0623[ENSU_CB_0623$CD=="76"& ENSU_CB_0623$CD < 97,]$BP1_1,
+     weights = ENSU_CB_0623[ENSU_CB_0623$CD=="76"& ENSU_CB_0623$CD < 98,]$FAC_SEL)
+
+freq(ENSU_CB_0623[ENSU_CB_0623$CD=="76"& ENSU_CB_0623$CD < 97,]$BP1_1)
+
+
+#Otro diseño
+DIS_2<-svydesign(ids = ~UPM, strata = ~EST, weights = ~FAC_SEL, data =ENSU_CB_0623, nest = T)
+
+summary(DIS_2)
+
+svymean(~factor(BP1_1), design = subset(DIS_2,CD=="76" & ENSU_CB_0623$CD < 98))
+
+
+
+
+#Replicar dato reportado en la tabla de resultados#
+
+
+
+
+
+#Percepción seguridad Iztapalapa con diseño muestral#
+
+svymean(~factor(BP1_1) , design = subset(CB_6_23, CD == "76"))
+
+
+
+###Confianza Gobiernos###
+
+#Recodificar variables de confianza en rangos#
+
+ENSU_CB_0623 <- ENSU_CB_0623 %>% mutate(
+  conf_pres = case_when(BP4_1_1 == "00" | BP4_1_1 == "01" | BP4_1_1 == "02" | BP4_1_1 == "03" ~ "No confía nada",
+                        BP4_1_1 == "04" | BP4_1_1 == "05" ~ "No confía",
+                        BP4_1_1 == "06" | BP4_1_1 == "07" ~ "Confía",
+                        BP4_1_1 == "08" | BP4_1_1 == "09" | BP4_1_1 == "10" ~ "Confía mucho",
+                        BP4_1_1 == "99" ~ NA),
+  conf_gob = case_when(BP4_1_2 == "00" | BP4_1_2 == "01" | BP4_1_2 == "02" | BP4_1_2 == "03" ~ "No confía nada",
+                       BP4_1_2 == "04" | BP4_1_2 == "05" ~ "No confía",
+                       BP4_1_2 == "06" | BP4_1_2 == "07" ~ "Confía",
+                       BP4_1_2 == "08" | BP4_1_2 == "09" | BP4_1_2 == "10" ~ "Confía mucho",
+                       BP4_1_2 == "99" ~ NA), 
+  conf_alc = case_when(BP4_1_3 == "00" | BP4_1_3 == "01" | BP4_1_3 == "02" | BP4_1_3 == "03" ~ "No confía nada",
+                       BP4_1_3 == "04" | BP4_1_3 == "05" ~ "No confía",
+                       BP4_1_3 == "06" | BP4_1_3 == "07" ~ "Confía",
+                       BP4_1_3 == "08" | BP4_1_3 == "09" | BP4_1_3 == "10" ~ "Confía mucho",
+                       BP4_1_3 == "99" ~ NA)
+)%>%
+  mutate(conf_pres = factor(conf_pres, levels = c("Confía mucho", "Confía", "No confía", "No confía nada")))%>%
+  mutate(conf_gob = factor(conf_gob, levels = c("Confía mucho", "Confía", "No confía", "No confía nada")))%>%
+  mutate(conf_alc = factor(conf_alc, levels = c("Confía mucho", "Confía", "No confía", "No confía nada")))
+
+
+
+#Vuelvo a correr el diseño muestral#
+
+
+(ENSU_CB_0623$conf_pres)
+
+CB_6_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0623, nest = T)
+
+
+
+svyby(~factor(conf_pres), by= ~NOM_ENT, design = CB_6_23, na.rm.all = T, svymean)
+
+
+resumen<- CB_6_23 %>%
+  tbl_svysummary(by=NOM_ENT, include = c(conf_pres, conf_gob, conf_alc), digits =~1)
+resumen
+
+#RESUMEN IZTAPALAPA#
+
+resumen_IZ<- subset(CB_6_23, CD=="76") %>%
+  tbl_svysummary(include = c(conf_pres, conf_gob, conf_alc), digits =~1, statistic = all_categorical() ~ "{p}%")
+resumen_IZ
+
+
+#RRESUMEN ALCALDÍAS
+table(ENSU_CB_0623$NOM_ENT)
+
+
+resumen_alc<- subset(CB_6_23, NOM_ENT == "CIUDAD DE MEXICO") %>%
+  tbl_svysummary(by= NOM_CD, include = c(conf_pres, conf_gob, conf_alc), digits =~1, statistic = all_categorical() ~ "{p}%")
+resumen_alc
+
+#Grafico
+ENSU_CB_0623<- ENSU_CB_0623 %>% mutate(
+  nom_cdmx = case_when(NOM_CD =="ALVARO OBREGON" ~ "A.OBR",
+                       NOM_CD =="AZCAPOTZALCO" ~ "AZCA",
+                       NOM_CD =="BENITO JUAREZ" ~ "B.JRZ",
+                       NOM_CD =="COYOACAN" ~ "COYO",
+                       NOM_CD =="CUAJIMALPA DE MORELOS" ~ "CUAJ",
+                       NOM_CD =="CUAUHTEMOC" ~ "CUAUH",
+                       NOM_CD =="GUSTAVO A. MADERO" ~ "GAM",
+                       NOM_CD =="IZTACALCO" ~ "IZTC",
+                       NOM_CD =="IZTAPALAPA" ~ "IZTP",
+                       NOM_CD =="LA MAGDALENA CONTRERAS" ~ "M.CONT",
+                       NOM_CD =="MIGUEL HIDALGO" ~ "M.HGO",
+                       NOM_CD =="MILPA ALTA" ~ "M.ALTA",
+                       NOM_CD =="TLAHUAC" ~ "TLHC",
+                       NOM_CD =="TLALPAN" ~ "TLPN",
+                       NOM_CD =="VENUSTIANO CARRANZA" ~ "V.CAR",
+                       NOM_CD =="XOCHIMILCO" ~ "XOCH",
+                       TRUE ~ NA))
+
+table(ENSU_CB_0623[ENSU_CB_0623$NOM_ENT == "CIUDAD DE MEXICO",]$nom_cdmx)
+
+CB_6_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0623, nest = T)
+
+str(ENSU_CB_0623$nom_cdmx)
+
+
+
+
+g1<- ggsurvey(subset(CB_6_23,  NOM_ENT == "CIUDAD DE MEXICO" & !is.na(conf_pres))) +  
+ aes(x = reorder(nom_cdmx, -as.numeric(BP4_1_1)), fill= conf_pres, weight = FAC_SEL)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+                                                                                                                                                                stat = "count",
+                                                                                                                                                                position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom") + ggtitle("Confianza en el Presidente Andrés Manuel López Obrador en CDMX por demarcación")
+
+g1
+
+
+
+
+g2<- ggsurvey(subset(CB_6_23,  NOM_ENT == "CIUDAD DE MEXICO" & !is.na(conf_gob))) +  
+  aes(x = reorder(nom_cdmx, -as.numeric(BP4_1_2)), fill= conf_gob, weight = FAC_SEL)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+                                                                                                                                                               stat = "count",
+                                                                                                                                                               position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Confianza en la Jefa de Gobierno Claudia Sheinbaum en CDMX por demarcación")
+
+g2
+
+table(ENSU_CB_0623$BP4_1_2, ENSU_CB_0623$conf_gob)
+
+
+g3<- ggsurvey(subset(CB_6_23,  NOM_ENT == "CIUDAD DE MEXICO" & !is.na(conf_alc))) +  
+  aes(x = reorder(nom_cdmx, -as.numeric(BP4_1_3)), fill= conf_alc, weight = FAC_SEL)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+                                                                                                                                                               stat = "count",
+                                                                                                                                                               position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Confianza en alcaldes y alcaldesas de la CDMX por demarcación
+                                                                  ")
+
+g3
+
+ENSU_CB_0623<- ENSU_CB_0623 %>%mutate(
+  BP1_1 = recode(BP1_1, 
+                 `1` = "Seguro",
+                 `2` = "Inseguro",
+                 `9` = NA_character_))
+
+summarytools::freq(ENSU_CB_0623$BP1_1, order = "freq")
+
+table(ENSU_CB_0623$nom_cdmx)
+
+ENSU_CB_0623 <- ENSU_CB_0623 %>% mutate( 
+  nom_cdmx2 = factor(nom_cdmx, levels = c("IZTP", "XOCH", "GAM", "IZTC", "TLHC", 
+                                         "AZCA", "A.OBR", "CUAUH", "M.CONT", "M.ALTA" , "V.CAR",
+                                         "TLPN","COYO", "M.HGO", "CUAJ", "B.JRZ"))
+)
+
+library(ggsurvey)
+
+table(ENSU_CB_0623$BP1_1)
+
+summarytools::freq(ENSU_CB_0623$BP1_1)
+
+g4<- ggsurvey(subset(CB_6_23,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx2, fill= BP1_1, weight = FAC_SEL) +geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en CDMX por demarcación", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2023")
+
+g4
+
+ggsurvey(subset(CB_6_23,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx2, fill= BP1_1, weight = FAC_SEL)+ geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en CDMX por demarcación")+
+  facet_grid(~SEXO, margins = TRUE)
+
+
++ facet_grid(~niv_ed2, margins = TRUE, labeller = as_labeller(nombres_grupos1))+
+  
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+            stat = "count",
+            position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")
+
+
+#Variable victimización al menos un delito
+
+table(ENSU_CB_0623$BP1_6_1)
+
+
+ENSU_CB_0623 <- ENSU_CB_0623 %>% mutate(
+  victi = case_when(BP1_6_1 == 9 | BP1_6_2 == 9 |
+                      BP1_6_3 == 9 | BP1_6_4 == 9 |
+                      BP1_6_5 == 9 | BP1_6_6 == 9 ~ NA,
+                    BP1_6_1 == 1 | BP1_6_2 == 1 |
+                      BP1_6_3 == 1 | BP1_6_4 == 1 |
+                      BP1_6_5 == 1 | BP1_6_6 == 1 ~ "Víctima",
+                    BP1_6_1 == 2 | BP1_6_2 == 2 |
+                      BP1_6_3 == 2 | BP1_6_4 == 2 |
+                      BP1_6_5 == 2 | BP1_6_6 == 2 ~ "No víctima")
+  )
+table(ENSU_CB_0623$victi)
+
+ENSU_CB_0623$victi2<-ifelse(ENSU_CB_0623$BP1_6_1 == 9 | ENSU_CB_0623$BP1_6_2 == 9 |
+                              ENSU_CB_0623$BP1_6_3 == 9 | ENSU_CB_0623$BP1_6_4 == 9 |
+                              ENSU_CB_0623$BP1_6_5 == 9 | ENSU_CB_0623$BP1_6_6 == 9, NA,
+                            ifelse(ENSU_CB_0623$BP1_6_1 == 1 | ENSU_CB_0623$BP1_6_2 == 1 |
+                                     ENSU_CB_0623$BP1_6_3 == 1 | ENSU_CB_0623$BP1_6_4 == 1 |
+                                     ENSU_CB_0623$BP1_6_5 == 1 | ENSU_CB_0623$BP1_6_6 == 1, "Víctima", "No víctima"))
+
+table(ENSU_CB_0623$victi2, useNA = "ifany")
+
+
+summarytools::freq(ENSU_CB_0623$victi2, weights = ENSU_CB_0623$FAC_VIV, missing = "NA")
+
+?summarytools::freq
+
+CB_6_23_VIV<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_VIV, data =ENSU_CB_0623, nest = T)
+
+svymean(~factor(victi2), design = CB_6_23_VIV, na.rm = T)
+
+
+g5<- ggsurvey(subset(CB_6_23_VIV,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx2, fill= victi, weight = FAC_SEL) +geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Victimización en el hogar en CDMX por demarcación", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2023")
+
+g5
+
+27.009849396146
+
+
+ENSU_2<-structure(list(BP1_4_1 = structure(c(1L, 1L, 2L, 1L, 2L, 2L, 
+                                             2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 
+                                             2L, 1L, 2L, 1L, 2L, 2L, 2L, 1L, 1L, 2L, 1L, 2L, 1L, 1L, 1L, 1L, 
+                                             1L, 1L, 2L, 1L, 2L, 2L, 2L, 1L, 1L, 2L, 2L, 1L, 2L, 1L, 2L, 1L, 
+                                             1L, 1L, 1L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 
+                                             2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 1L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 
+                                             1L, 1L, 2L, 1L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 
+                                             2L, 2L, 2L, 2L, 1L, 2L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 2L, 
+                                             2L, 1L, 1L, 2L, 1L, 2L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 2L, 
+                                             2L, 2L, 2L, 2L, 1L, 2L, 2L, 1L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 
+                                             1L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 2L, 2L, 2L, 1L, 2L, 2L, 1L, 
+                                             2L, 2L, 1L, 2L, 2L, 2L, 1L, 2L, 1L, 1L, 1L, 1L, 2L, 2L, 2L, 2L, 
+                                             1L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 2L, 2L, 2L, 1L, 1L, 
+                                             1L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 2L, 2L, 
+                                             2L, 1L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 1L, 2L, 1L, 1L, 
+                                             2L, 2L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 
+                                             1L, 2L, 1L, 1L, 2L, 2L, 1L, 2L, 2L, 2L, 1L, 1L, 2L, 2L, 1L, 1L, 
+                                             1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L), levels = c("Sí", 
+                                                                                                     "No", "NS/NR"), class = "factor"), BP1_4_2 = structure(c(1L, 
+                                                                                                                                                              1L, 2L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                              2L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                              2L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                              1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 2L, 
+                                                                                                                                                              2L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                              1L, 1L, 2L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 
+                                                                                                                                                              2L, 1L, 2L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 2L, 1L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                              1L, 1L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 
+                                                                                                                                                              1L, 1L, 1L, 1L, 2L, 1L, 2L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                              1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 1L, 2L, 
+                                                                                                                                                              1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 2L, 2L, 1L, 2L, 1L, 1L, 
+                                                                                                                                                              1L, 1L, 2L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 3L, 1L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                              2L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                              1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 1L, 2L, 
+                                                                                                                                                              1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 2L, 1L, 
+                                                                                                                                                              1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                              1L, 1L, 1L, 1L, 1L, 2L, 1L, 2L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L
+                                                                                                     ), levels = c("Sí", "No", "NS/NR"), class = "factor"), BP1_4_3 = structure(c(1L, 
+                                                                                                                                                                                  1L, 2L, 2L, 2L, 1L, 2L, 2L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 2L, 
+                                                                                                                                                                                  2L, 2L, 1L, 2L, 1L, 2L, 1L, 2L, 1L, 1L, 2L, 2L, 1L, 1L, 2L, 1L, 
+                                                                                                                                                                                  1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 2L, 1L, 2L, 
+                                                                                                                                                                                  1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 1L, 2L, 1L, 1L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 2L, 2L, 1L, 2L, 1L, 1L, 2L, 1L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 1L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 1L, 2L, 1L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 1L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 2L, 1L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 1L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 1L, 2L, 1L, 1L, 
+                                                                                                                                                                                  2L, 1L, 2L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 2L, 2L, 
+                                                                                                                                                                                  2L, 1L, 2L, 2L, 1L, 2L, 1L, 1L, 2L, 2L, 2L, 1L, 2L, 2L, 1L, 1L, 
+                                                                                                                                                                                  1L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 1L, 2L, 1L, 2L, 1L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 1L, 1L, 2L, 
+                                                                                                                                                                                  1L, 1L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 2L, 2L, 2L, 1L, 1L, 2L, 
+                                                                                                                                                                                  2L, 1L, 1L, 1L, 1L, 2L, 2L, 2L, 1L, 1L, 2L, 1L, 1L, 1L, 2L, 2L, 
+                                                                                                                                                                                  1L, 1L, 1L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                                                  2L, 2L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L
+                                                                                                     ), levels = c("Sí", "No", "NS/NR"), class = "factor"), BP1_4_4 = structure(c(1L, 
+                                                                                                                                                                                  1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 1L, 1L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 1L, 2L, 1L, 2L, 1L, 2L, 1L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                                                  2L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 2L, 2L, 2L, 
+                                                                                                                                                                                  1L, 2L, 1L, 2L, 2L, 2L, 1L, 2L, 1L, 2L, 2L, 2L, 2L, 1L, 1L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 
+                                                                                                                                                                                  1L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 1L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 1L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 2L, 2L, 
+                                                                                                                                                                                  2L, 1L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  1L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 
+                                                                                                                                                                                  2L, 1L, 2L, 1L, 1L, 1L, 1L, 2L, 2L, 2L, 1L, 1L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 1L, 1L, 2L, 2L, 2L, 1L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 
+                                                                                                                                                                                  2L, 2L, 1L, 1L, 2L, 2L, 2L, 1L, 2L, 1L, 2L, 2L, 2L, 1L, 2L, 1L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 1L, 2L, 1L, 
+                                                                                                                                                                                  1L, 2L, 2L, 1L, 1L, 2L, 2L, 1L, 1L, 2L, 2L, 1L, 1L, 1L, 1L, 1L
+                                                                                                     ), levels = c("Sí", "No", "NS/NR"), class = "factor"), BP1_4_5 = structure(c(1L, 
+                                                                                                                                                                                  1L, 2L, 1L, 3L, 2L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 2L, 
+                                                                                                                                                                                  2L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                                                  2L, 1L, 1L, 1L, 2L, 1L, 2L, 1L, 1L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 2L, 1L, 2L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 2L, 
+                                                                                                                                                                                  1L, 1L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 2L, 2L, 1L, 1L, 1L, 2L, 2L, 1L, 2L, 2L, 1L, 2L, 1L, 2L, 2L, 
+                                                                                                                                                                                  2L, 1L, 2L, 2L, 1L, 2L, 1L, 2L, 2L, 2L, 2L, 1L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 1L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 2L, 2L, 2L, 1L, 2L, 2L, 
+                                                                                                                                                                                  1L, 2L, 2L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 2L, 2L, 1L, 1L, 2L, 2L, 
+                                                                                                                                                                                  1L, 1L, 1L, 2L, 1L, 1L, 2L, 1L, 2L, 2L, 2L, 3L, 2L, 2L, 2L, 1L, 
+                                                                                                                                                                                  1L, 2L, 2L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 1L, 1L, 2L, 1L, 3L, 
+                                                                                                                                                                                  2L, 1L, 2L, 2L, 1L, 1L, 1L, 2L, 2L, 2L, 1L, 2L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 2L, 1L, 1L, 1L, 3L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 1L, 1L, 2L, 
+                                                                                                                                                                                  1L, 1L, 1L, 1L, 1L, 2L, 2L, 1L, 2L, 1L, 2L, 1L, 2L, 1L, 2L, 2L, 
+                                                                                                                                                                                  1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 2L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 2L, 1L, 2L, 1L, 1L, 1L, 1L
+                                                                                                     ), levels = c("Sí", "No", "NS/NR"), class = "factor"), BP1_4_6 = structure(c(1L, 
+                                                                                                                                                                                  1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 1L, 2L, 2L, 1L, 1L, 2L, 1L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                                                  2L, 1L, 1L, 2L, 1L, 1L, 2L, 2L, 1L, 2L, 2L, 2L, 1L, 1L, 1L, 2L, 
+                                                                                                                                                                                  1L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 1L, 1L, 2L, 2L, 1L, 1L, 1L, 2L, 
+                                                                                                                                                                                  2L, 1L, 2L, 1L, 1L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 1L, 
+                                                                                                                                                                                  1L, 2L, 1L, 1L, 2L, 1L, 1L, 2L, 1L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 2L, 1L, 2L, 1L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 1L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 2L, 2L, 1L, 2L, 1L, 1L, 2L, 1L, 1L, 2L, 2L, 1L, 1L, 1L, 2L, 
+                                                                                                                                                                                  2L, 2L, 1L, 1L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 1L, 1L, 2L, 2L, 
+                                                                                                                                                                                  2L, 1L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  1L, 1L, 2L, 2L, 2L, 1L, 2L, 1L, 2L, 2L, 2L, 1L, 1L, 2L, 1L, 1L, 
+                                                                                                                                                                                  2L, 2L, 1L, 2L, 2L, 1L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 
+                                                                                                                                                                                  1L, 1L, 1L, 1L, 2L, 3L, 1L, 2L, 1L, 1L, 2L, 1L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 1L, 2L, 2L, 1L, 2L, 2L, 1L, 1L, 2L, 1L, 1L, 2L, 2L, 
+                                                                                                                                                                                  1L, 1L, 2L, 1L, 1L, 1L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 1L, 
+                                                                                                                                                                                  1L, 1L, 2L, 1L, 1L, 2L, 1L, 1L, 1L, 2L, 1L, 1L, 1L, 1L, 1L, 1L
+                                                                                                     ), levels = c("Sí", "No", "NS/NR"), class = "factor"), BP1_4_7 = structure(c(2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 3L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 3L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  1L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 3L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 3L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L
+                                                                                                     ), levels = c("Sí", "No", "NS/NR"), class = "factor"), BP1_4_8 = structure(c(2L, 
+                                                                                                                                                                                  1L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 3L, 2L, 
+                                                                                                                                                                                  2L, 2L, 1L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 1L, 
+                                                                                                                                                                                  2L, 1L, 1L, 2L, 2L, 1L, 2L, 1L, 3L, 2L, 2L, 2L, 2L, 1L, 1L, 2L, 
+                                                                                                                                                                                  2L, 2L, 1L, 2L, 1L, 1L, 2L, 1L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 
+                                                                                                                                                                                  1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  1L, 2L, 2L, 2L, 2L, 1L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 1L, 2L, 2L, 1L, 1L, 2L, 2L, 
+                                                                                                                                                                                  2L, 1L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 3L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 2L, 1L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 
+                                                                                                                                                                                  2L, 2L, 2L, 2L, 2L, 3L, 3L, 2L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  3L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 1L, 1L, 2L, 2L, 2L, 2L, 
+                                                                                                                                                                                  1L, 2L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 1L, 3L, 2L, 2L, 
+                                                                                                                                                                                  2L, 2L, 1L, 1L, 2L, 2L, 1L, 2L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L
+                                                                                                     ), levels = c("Sí", "No", "NS/NR"), class = "factor"), UPM_DIS = c("01235", 
+                                                                                                                                                                        "01235", "01235", "01235", "01235", "01236", "01236", "01236", 
+                                                                                                                                                                        "01236", "01236", "01237", "01237", "01237", "01237", "01238", 
+                                                                                                                                                                        "01238", "01238", "01238", "01239", "01239", "01239", "01239", 
+                                                                                                                                                                        "01239", "01240", "01240", "01240", "01240", "01241", "01241", 
+                                                                                                                                                                        "01241", "01241", "01242", "01242", "01242", "01242", "01242", 
+                                                                                                                                                                        "01243", "01243", "01243", "01243", "01244", "01244", "01244", 
+                                                                                                                                                                        "01244", "01244", "01245", "01245", "01245", "01245", "01245", 
+                                                                                                                                                                        "01246", "01246", "01246", "01246", "01246", "01247", "01247", 
+                                                                                                                                                                        "01247", "01247", "01247", "01248", "01248", "01248", "01248", 
+                                                                                                                                                                        "01249", "01249", "01249", "01249", "01250", "01250", "01250", 
+                                                                                                                                                                        "01250", "01250", "01251", "01251", "01251", "01251", "01252", 
+                                                                                                                                                                        "01252", "01252", "01252", "01252", "01253", "01253", "01253", 
+                                                                                                                                                                        "01253", "01253", "01254", "01254", "01254", "01255", "01255", 
+                                                                                                                                                                        "01255", "01255", "01255", "01256", "01256", "01256", "01256", 
+                                                                                                                                                                        "01256", "01257", "01257", "01257", "01257", "01257", "01258", 
+                                                                                                                                                                        "01258", "01258", "01258", "01259", "01259", "01259", "01259", 
+                                                                                                                                                                        "01260", "01260", "01260", "01260", "01260", "01261", "01261", 
+                                                                                                                                                                        "01261", "01261", "01261", "01262", "01262", "01262", "01262", 
+                                                                                                                                                                        "01262", "01263", "01263", "01263", "01263", "01263", "01264", 
+                                                                                                                                                                        "01264", "01264", "01264", "01264", "01265", "01265", "01265", 
+                                                                                                                                                                        "01265", "01265", "01266", "01266", "01266", "01266", "01266", 
+                                                                                                                                                                        "01267", "01267", "01267", "01267", "01267", "01268", "01268", 
+                                                                                                                                                                        "01268", "01268", "01269", "01269", "01269", "01269", "01269", 
+                                                                                                                                                                        "01270", "01270", "01270", "01270", "01271", "01271", "01271", 
+                                                                                                                                                                        "01271", "01271", "01272", "01272", "01272", "01272", "01272", 
+                                                                                                                                                                        "01273", "01273", "01273", "01273", "01274", "01274", "01274", 
+                                                                                                                                                                        "01274", "01275", "01275", "01275", "01275", "01275", "01276", 
+                                                                                                                                                                        "01276", "01276", "01276", "01277", "01277", "01277", "01277", 
+                                                                                                                                                                        "01278", "01278", "01278", "01278", "01278", "01279", "01279", 
+                                                                                                                                                                        "01279", "01279", "01279", "01280", "01280", "01280", "01281", 
+                                                                                                                                                                        "01281", "01281", "01281", "01281", "01282", "01282", "01282", 
+                                                                                                                                                                        "01282", "01282", "01283", "01283", "01283", "01283", "01283", 
+                                                                                                                                                                        "01284", "01284", "01284", "01284", "01285", "01285", "01285", 
+                                                                                                                                                                        "01286", "01286", "01286", "01286", "01286", "01287", "01287", 
+                                                                                                                                                                        "01287", "01288", "01288", "01288", "01288", "01288", "01289", 
+                                                                                                                                                                        "01289", "01289", "01289", "01290", "01290", "01290", "01290", 
+                                                                                                                                                                        "01290", "01291", "01291", "01291", "01291", "01291", "01292", 
+                                                                                                                                                                        "01292", "01292", "01292", "01292", "01886", "01886", "01886", 
+                                                                                                                                                                        "01886", "01887", "01887", "01887", "01887", "01887"), EST_DIS = c("0017", 
+                                                                                                                                                                                                                                           "0017", "0017", "0017", "0017", "0017", "0017", "0017", "0017", 
+                                                                                                                                                                                                                                           "0017", "0017", "0017", "0017", "0017", "0017", "0017", "0017", 
+                                                                                                                                                                                                                                           "0017", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0017", "0017", "0017", "0017", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0017", "0017", "0017", "0017", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0017", "0017", 
+                                                                                                                                                                                                                                           "0017", "0017", "0017", "0016", "0016", "0016", "0016", "0018", 
+                                                                                                                                                                                                                                           "0018", "0018", "0018", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0017", "0017", "0017", "0017", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0017", "0017", "0017", "0017", "0017", 
+                                                                                                                                                                                                                                           "0017", "0017", "0017", "0017", "0017", "0017", "0017", "0017", 
+                                                                                                                                                                                                                                           "0017", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0017", "0017", "0017", "0017", "0017", "0017", 
+                                                                                                                                                                                                                                           "0017", "0017", "0017", "0017", "0017", "0017", "0017", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0017", "0017", "0017", "0017", "0016", "0016", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0017", "0017", 
+                                                                                                                                                                                                                                           "0017", "0017", "0017", "0017", "0017", "0017", "0016", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0017", "0017", "0017", "0017", "0017", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0017", "0017", "0017", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0017", "0017", "0017", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0017", "0017", "0017", "0017", 
+                                                                                                                                                                                                                                           "0018", "0018", "0018", "0018", "0018", "0018", "0018", "0018", 
+                                                                                                                                                                                                                                           "0018", "0018", "0018", "0018", "0018", "0018", "0018", "0016", 
+                                                                                                                                                                                                                                           "0016", "0016", "0016", "0016", "0016", "0016", "0016", "0016"
+                                                                                                                                                                        ), FAC_SEL = c(2730, 13652, 8191, 8191, 8191, 7127, 4751, 11878, 
+                                                                                                                                                                                       7127, 7127, 19605, 5602, 8402, 5602, 7615, 2538, 5076, 5076, 
+                                                                                                                                                                                       6049, 8066, 4033, 2016, 4033, 6467, 6467, 4311, 4311, 4807, 4807, 
+                                                                                                                                                                                       2404, 7211, 3796, 5694, 3796, 3796, 7592, 2511, 7533, 12555, 
+                                                                                                                                                                                       5022, 4109, 4109, 6163, 6163, 6163, 5738, 3825, 7650, 3825, 7650, 
+                                                                                                                                                                                       3745, 7490, 3745, 3745, 9362, 7514, 10019, 7514, 10019, 5009, 
+                                                                                                                                                                                       6771, 4514, 4514, 11285, 3652, 1826, 1826, 3652, 8891, 1778, 
+                                                                                                                                                                                       5334, 3556, 3556, 8830, 4415, 11037, 8830, 6368, 2123, 6368, 
+                                                                                                                                                                                       14860, 4246, 3635, 1818, 5453, 5453, 1818, 4026, 4026, 4026, 
+                                                                                                                                                                                       2202, 2202, 4405, 2202, 4405, 5132, 6843, 5132, 3421, 3421, 3674, 
+                                                                                                                                                                                       3674, 7349, 3674, 5512, 4041, 8083, 2021, 4041, 2114, 4227, 4227, 
+                                                                                                                                                                                       4227, 3802, 3802, 5702, 9504, 5702, 9360, 1872, 3744, 11232, 
+                                                                                                                                                                                       3744, 3285, 9856, 6571, 3285, 1643, 1573, 3146, 6293, 6293, 3146, 
+                                                                                                                                                                                       1546, 7729, 1546, 7729, 3092, 6252, 2084, 8335, 8335, 4168, 3620, 
+                                                                                                                                                                                       7240, 1810, 1810, 5430, 6640, 8853, 6640, 8853, 4426, 4403, 6604, 
+                                                                                                                                                                                       4403, 4403, 7423, 7423, 7423, 7423, 4949, 6745, 6745, 3373, 1686, 
+                                                                                                                                                                                       1806, 3612, 7225, 1806, 3612, 8882, 2220, 6661, 4441, 6661, 5525, 
+                                                                                                                                                                                       5525, 5525, 13812, 5697, 1899, 1899, 1899, 6056, 2019, 4037, 
+                                                                                                                                                                                       6056, 2019, 5574, 9290, 7432, 3716, 6597, 4398, 4398, 6597, 1780, 
+                                                                                                                                                                                       3561, 5341, 5341, 3561, 4259, 2130, 4259, 4259, 6389, 4313, 6470, 
+                                                                                                                                                                                       8626, 5303, 7954, 7954, 5303, 5303, 3612, 3612, 3612, 7223, 5417, 
+                                                                                                                                                                                       2326, 2326, 4652, 9304, 6978, 3549, 5323, 8872, 7098, 9332, 6999, 
+                                                                                                                                                                                       2333, 4154, 6231, 4154, 8308, 2077, 4121, 8241, 6181, 4047, 8094, 
+                                                                                                                                                                                       6070, 4047, 2023, 18464, 13848, 4616, 4616, 2460, 7379, 7379, 
+                                                                                                                                                                                       2460, 9838, 2008, 2008, 8030, 4015, 4015, 2052, 4103, 4103, 4103, 
+                                                                                                                                                                                       4103, 5579, 3719, 3719, 5579, 1339, 1339, 2677, 5354, 1339), 
+                       nom_cdmx2 = structure(c(3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 
+                                               3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L), levels = c("TLHC", "XOCH", 
+                                                                                               "IZTP", "IZTC", "TLPN", "CUAUH", "AZCA", "GAM", "A.OBR", 
+                                                                                               "M.CONT", "M.ALTA", "V.CAR", "COYO", "M.HGO", "CUAJ", "B.JRZ"
+                                               ), class = "factor"), NOM_ENT = c("CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", "CIUDAD DE MEXICO", 
+                                                                                 "CIUDAD DE MEXICO")), row.names = c(5444L, 5445L, 5446L, 
+                                                                                                                     5447L, 5448L, 5449L, 5450L, 5451L, 5452L, 5453L, 5454L, 5455L, 
+                                                                                                                     5456L, 5457L, 5458L, 5459L, 5460L, 5461L, 5462L, 5463L, 5464L, 
+                                                                                                                     5465L, 5466L, 5467L, 5468L, 5469L, 5470L, 5471L, 5472L, 5473L, 
+                                                                                                                     5474L, 5475L, 5476L, 5477L, 5478L, 5479L, 5480L, 5481L, 5482L, 
+                                                                                                                     5483L, 5484L, 5485L, 5486L, 5487L, 5488L, 5489L, 5490L, 5491L, 
+                                                                                                                     5492L, 5493L, 5494L, 5495L, 5496L, 5497L, 5498L, 5499L, 5500L, 
+                                                                                                                     5501L, 5502L, 5503L, 5504L, 5505L, 5506L, 5507L, 5508L, 5509L, 
+                                                                                                                     5510L, 5511L, 5512L, 5513L, 5514L, 5515L, 5516L, 5517L, 5518L, 
+                                                                                                                     5519L, 5520L, 5521L, 5522L, 5523L, 5524L, 5525L, 5526L, 5527L, 
+                                                                                                                     5528L, 5529L, 5530L, 5531L, 5532L, 5533L, 5534L, 5535L, 5536L, 
+                                                                                                                     5537L, 5538L, 5539L, 5540L, 5541L, 5542L, 5543L, 5544L, 5545L, 
+                                                                                                                     5546L, 5547L, 5548L, 5549L, 5550L, 5551L, 5552L, 5553L, 5554L, 
+                                                                                                                     5555L, 5556L, 5557L, 5558L, 5559L, 5560L, 5561L, 5562L, 5563L, 
+                                                                                                                     5564L, 5565L, 5566L, 5567L, 5568L, 5569L, 5570L, 5571L, 5572L, 
+                                                                                                                     5573L, 5574L, 5575L, 5576L, 5577L, 5578L, 5579L, 5580L, 5581L, 
+                                                                                                                     5582L, 5583L, 5584L, 5585L, 5586L, 5587L, 5588L, 5589L, 5590L, 
+                                                                                                                     5591L, 5592L, 5593L, 5594L, 5595L, 5596L, 5597L, 5598L, 5599L, 
+                                                                                                                     5600L, 5601L, 5602L, 5603L, 5604L, 5605L, 5606L, 5607L, 5608L, 
+                                                                                                                     5609L, 5610L, 5611L, 5612L, 5613L, 5614L, 5615L, 5616L, 5617L, 
+                                                                                                                     5618L, 5619L, 5620L, 5621L, 5622L, 5623L, 5624L, 5625L, 5626L, 
+                                                                                                                     5627L, 5628L, 5629L, 5630L, 5631L, 5632L, 5633L, 5634L, 5635L, 
+                                                                                                                     5636L, 5637L, 5638L, 5639L, 5640L, 5641L, 5642L, 5643L, 5644L, 
+                                                                                                                     5645L, 5646L, 5647L, 5648L, 5649L, 5650L, 5651L, 5652L, 5653L, 
+                                                                                                                     5654L, 5655L, 5656L, 5657L, 5658L, 5659L, 5660L, 5661L, 5662L, 
+                                                                                                                     5663L, 5664L, 5665L, 5666L, 5667L, 5668L, 5669L, 5670L, 5671L, 
+                                                                                                                     5672L, 5673L, 5674L, 5675L, 5676L, 5677L, 5678L, 5679L, 5680L, 
+                                                                                                                     5681L, 5682L, 5683L, 5684L, 5685L, 5686L, 5687L, 5688L, 5689L, 
+                                                                                                                     5690L, 5691L, 5692L, 5693L, 5694L, 5695L, 5696L, 5697L, 5698L, 
+                                                                                                                     5699L, 5700L, 5701L, 5702L, 5703L, 5704L, 5705L, 5706L, 5707L, 
+                                                                                                                     8340L, 8341L, 8342L, 8343L, 8344L, 8345L, 8346L, 8347L, 8348L
+                                                                                 ), class = "data.frame")
+
+
+
+####################### Septiembre 2023###########################
+
+#Leer R.DATA de la ENSU 09/23#
+load("G:/Mi unidad/Iztapalapa/Encuestas/ENSU/09_23/BD_ENSU_0923.RData")
+
+#DF para ejemplo reproducible#
+#ENSU_CB_0923<- ENSU_CB_0923 %>%
+#  subset(nom_cdmx2 =="IZTP")%>%
+#  select(c(starts_with("BP1_4_"), UPM_DIS, EST_DIS, FAC_SEL, nom_cdmx2, NOM_ENT))
+
+#ENSU_CB_0923
+
+#dput(ENSU_CB_0923)
+
+CB_9_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+
+
+
+
+
+per_seg<-svymean(~factor(BP1_1) , design = CB_9_23)
+per_seg
+
+
+confint(per_seg, level = 0.9)
+
+#Coincide exactamente con tabulados INEGI#
+
+
+cdmx_seg<-subset(CB_9_23,  CVE_ENT == "09")
+
+
+svymean(~factor(BP1_1), design = cdmx_seg)
+
+
+#Otro diseño
+DIS_2<-svydesign(ids = ~UPM, strata = ~EST, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+summary(DIS_2)
+
+svymean(~factor(BP1_1), design = subset(DIS_2,CD=="76" & ENSU_CB_0923$CD < 98))
+
+svymean(~factor(BP1_1), design = subset(CB_9_23,CD=="76" & ENSU_CB_0923$CD < 98))
+
+
+###Confianza Gobiernos###
+
+#Recodificar variables de confianza en rangos#
+
+
+ENSU_CB_0923 <- ENSU_CB_0923 %>% mutate(
+  conf_pres = case_when(BP5_1_1 == "00" | BP5_1_1 == "01" | BP5_1_1 == "02" | BP5_1_1 == "03" ~ "No confía nada (0 a 3)",
+                        BP5_1_1 == "04" | BP5_1_1 == "05" ~ "No confía (4 a 5)",
+                        BP5_1_1 == "06" | BP5_1_1 == "07" ~ "Confía (6 a 7)",
+                        BP5_1_1 == "08" | BP5_1_1 == "09" | BP5_1_1 == "10" ~ "Confía mucho (8 a 10)",
+                        BP5_1_1 == "99" ~ NA),
+  conf_gob = case_when(BP5_1_2 == "00" | BP5_1_2 == "01" | BP5_1_2 == "02" | BP5_1_2 == "03" ~ "No confía nada (0 a 3)",
+                       BP5_1_2 == "04" | BP5_1_2 == "05" ~ "No confía (4 a 5)",
+                       BP5_1_2 == "06" | BP5_1_2 == "07" ~ "Confía (6 a 7)",
+                       BP5_1_2 == "08" | BP5_1_2 == "09" | BP5_1_2 == "10" ~ "Confía mucho (8 a 10)",
+                       BP5_1_2 == "99" ~ NA), 
+  conf_alc = case_when(BP5_1_3 == "00" | BP5_1_3 == "01" | BP5_1_3 == "02" | BP5_1_3 == "03" ~ "No confía nada (0 a 3)",
+                       BP5_1_3 == "04" | BP5_1_3 == "05" ~ "No confía (4 a 5)",
+                       BP5_1_3 == "06" | BP5_1_3 == "07" ~ "Confía (6 a 7)",
+                       BP5_1_3 == "08" | BP5_1_3 == "09" | BP5_1_3 == "10" ~ "Confía mucho (8 a 10)",
+                       BP5_1_3 == "99" ~ NA)
+)%>%
+  mutate(conf_pres = factor(conf_pres, levels = c("Confía mucho (8 a 10)", "Confía (6 a 7)", "No confía (4 a 5)", "No confía nada (0 a 3)")))%>%
+  mutate(conf_gob = factor(conf_gob, levels = c("Confía mucho (8 a 10)", "Confía (6 a 7)", "No confía (4 a 5)", "No confía nada (0 a 3)")))%>%
+  mutate(conf_alc = factor(conf_alc, levels = c("Confía mucho (8 a 10)", "Confía (6 a 7)", "No confía (4 a 5)", "No confía nada (0 a 3)")))
+
+
+ENSU_CB_0923 <- ENSU_CB_0923 %>% mutate(
+  conf_alc_pp = case_when(BP5_1_3 == "00" | BP5_1_3 == "01" | BP5_1_3 == "02" | BP5_1_3 == "03" | BP5_1_3 == "04" | BP5_1_3 == "05" ~ "No confía (0 - 5)",
+                          BP5_1_3 == "07" | BP5_1_3 == "06" | BP5_1_3 == "08" | BP5_1_3 == "09" | BP5_1_3 == "10"  ~ "Confía (6 - 10)",
+                       BP5_1_3 == "99" ~ "NS/NR")
+)%>%
+  mutate(conf_alc_pp = factor(conf_alc_pp, levels = c("Confía (6 - 10)", "No confía (0 - 5)", "NS/NR")))
+
+table(ENSU_CB_0923$conf_alc_pp)
+
+
+
+
+#Vuelvo a correr el diseño muestral#
+
+
+CB_9_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+
+
+svyby(~factor(conf_alc_pp), by= ~NOM_ENT, design = CB_9_23, na.rm.all = T, svymean)
+
+
+resumen<- CB_9_23 %>%
+  tbl_svysummary(by=NOM_ENT, include = c(conf_pres, conf_gob, conf_alc), digits =~1)
+resumen
+
+
+
+#Comparativo CDMX#
+
+ENSU_CB_0923<- ENSU_CB_0923 %>% mutate(
+  nom_cdmx = case_when(NOM_CD =="ALVARO OBREGON" ~ "A.OBR",
+                       NOM_CD =="AZCAPOTZALCO" ~ "AZCA",
+                       NOM_CD =="BENITO JUAREZ" ~ "B.JRZ",
+                       NOM_CD =="COYOACAN" ~ "COYO",
+                       NOM_CD =="CUAJIMALPA DE MORELOS" ~ "CUAJ",
+                       NOM_CD =="CUAUHTEMOC" ~ "CUAUH",
+                       NOM_CD =="GUSTAVO A. MADERO" ~ "GAM",
+                       NOM_CD =="IZTACALCO" ~ "IZTC",
+                       NOM_CD =="IZTAPALAPA" ~ "IZTP",
+                       NOM_CD =="LA MAGDALENA CONTRERAS" ~ "M.CONT",
+                       NOM_CD =="MIGUEL HIDALGO" ~ "M.HGO",
+                       NOM_CD =="MILPA ALTA" ~ "M.ALTA",
+                       NOM_CD =="TLAHUAC" ~ "TLHC",
+                       NOM_CD =="TLALPAN" ~ "TLPN",
+                       NOM_CD =="VENUSTIANO CARRANZA" ~ "V.CAR",
+                       NOM_CD =="XOCHIMILCO" ~ "XOCH",
+                       TRUE ~ NA))
+
+
+ENSU_CB_0923 <- ENSU_CB_0923 %>% mutate( 
+  nom_cdmx1 = factor(nom_cdmx, levels = c("IZTP", "CUAJ", "B.JRZ", "V.CAR", 
+                                          "COYO", "TLHC", "M.CONT", "TLPN", 
+                                          "A.OBR" , "AZCA","M.HGO", "GAM",
+                                          "M.ALTA", "XOCH","CUAUH", "IZTC" ))
+)
+
+
+CB_9_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+
+#Resumen Iztapalapa#
+resumen_IZ<- subset(CB_9_23, CD=="76") %>%
+  tbl_svysummary(nom_cdmx,include = c(BP5_1_3), digits =~5, statistic = all_categorical() ~ "{p}%")
+resumen_IZ
+
+
+resumen_IZ<- subset(CB_9_23, CD=="76") %>%
+  tbl_svysummary(nom_cdmx,include = c(BP5_1_3), digits =~5, statistic = all_categorical() ~ "{p}%")
+resumen_IZ
+
+resumen_IZ<- subset(ENSU_CB_0923, CD=="76") %>%
+  tbl_summary(nom_cdmx,include = c(BP5_1_3), digits =~5, statistic = all_categorical() ~ "{p}%")
+resumen_IZ
+
+
+
+#RRESUMEN ALCALDÍAS
+table(ENSU_CB_0923$NOM_ENT)
+
+
+resumen_alc<- subset(ENSU_CB_0923, NOM_ENT == "CIUDAD DE MEXICO") %>%
+  tbl_summary(by= conf_alc_pp, 
+              include = nom_cdmx, digits =~2,
+              statistic = all_categorical() ~ "{p}%",
+              percent = "row")
+resumen_alc
+library(dplyr, warn.conflicts = F)
+library(gt)
+
+
+########Tablas datos crudos################
+
+#######Confianza en Alcaldes####
+resumen_alc_horr<- subset(ENSU_CB_0923, NOM_ENT == "CIUDAD DE MEXICO" & conf_alc_pp != "NS/NR") %>%
+  tbl_summary(by= conf_alc_pp, 
+              include = nom_cdmx1, digits =~2,
+              statistic = all_categorical() ~ "{p}%",
+              percent = "row",
+              label = nom_cdmx1 ~ "Demarcación"
+              )%>%
+  modify_header(label = "**Sept. 2023**")%>%
+  modify_footnote(update = everything() ~ NA)%>%
+  modify_spanning_header(all_stat_cols() ~ "**Confianza en Alcaldes por demarcación**")%>% 
+  as_gt(include = -tab_footnote) %>%  # if using gt, can exclude footnotes this way 
+  tab_footnote( # and can modify/add footnotes this way
+    footnote = "Fuente: INEGI, Encuesta Nacional de Seguridad Urbana, Tercer Trimestre 2023")
+
+resumen_alc_horr
+
+######## Efectividad para atender problemas############
+
+resumen_alc_horr<- subset(ENSU_CB_0923, NOM_ENT == "CIUDAD DE MEXICO" & conf_alc_pp != "NS/NR") %>%
+  tbl_summary(by= conf_alc_pp, 
+              include = nom_cdmx1, digits =~0,
+              statistic = all_categorical() ~ "{p}%",
+              percent = "row",
+              label = nom_cdmx1 ~ "Demarcación"
+  )%>%
+  modify_header(label = "**Sept. 2023**")%>%
+  modify_footnote(update = everything() ~ NA)%>%
+  modify_spanning_header(all_stat_cols() ~ "**Confianza en Alcaldes por demarcación**")%>% 
+  as_gt(include = -tab_footnote) %>%  # if using gt, can exclude footnotes this way 
+  tab_footnote( # and can modify/add footnotes this way
+    footnote = "Fuente: INEGI, Encuesta Nacional de Seguridad Urbana, Tercer Trimestre 2023")
+
+resumen_alc_horr
+
+
+
+
+
+
+#Comparativo CDMX#
+
+ENSU_CB_0923<- ENSU_CB_0923 %>% mutate(
+  nom_cdmx = case_when(NOM_CD =="ALVARO OBREGON" ~ "A.OBR",
+                       NOM_CD =="AZCAPOTZALCO" ~ "AZCA",
+                       NOM_CD =="BENITO JUAREZ" ~ "B.JRZ",
+                       NOM_CD =="COYOACAN" ~ "COYO",
+                       NOM_CD =="CUAJIMALPA DE MORELOS" ~ "CUAJ",
+                       NOM_CD =="CUAUHTEMOC" ~ "CUAUH",
+                       NOM_CD =="GUSTAVO A. MADERO" ~ "GAM",
+                       NOM_CD =="IZTACALCO" ~ "IZTC",
+                       NOM_CD =="IZTAPALAPA" ~ "IZTP",
+                       NOM_CD =="LA MAGDALENA CONTRERAS" ~ "M.CONT",
+                       NOM_CD =="MIGUEL HIDALGO" ~ "M.HGO",
+                       NOM_CD =="MILPA ALTA" ~ "M.ALTA",
+                       NOM_CD =="TLAHUAC" ~ "TLHC",
+                       NOM_CD =="TLALPAN" ~ "TLPN",
+                       NOM_CD =="VENUSTIANO CARRANZA" ~ "V.CAR",
+                       NOM_CD =="XOCHIMILCO" ~ "XOCH",
+                       TRUE ~ NA))
+
+table(ENSU_CB_0923[ENSU_CB_0923$NOM_ENT == "CIUDAD DE MEXICO",]$nom_cdmx)
+
+CB_9_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+str(ENSU_CB_0923$nom_cdmx)
+
+
+
+
+g1<- ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & !is.na(conf_pres))) +  
+  aes(x = reorder(nom_cdmx, -as.numeric(BP5_1_1)), fill= conf_pres, weight = FAC_SEL)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+                                                                                                                                                                stat = "count",
+                                                                                                                                                                position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom") + ggtitle("Confianza en el Presidente Andrés Manuel López Obrador en CDMX por demarcación",
+                                                                   subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")
+
+g1
+
+
+
+
+g2<- ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & !is.na(conf_gob))) +  
+  aes(x = reorder(nom_cdmx, -as.numeric(BP5_1_2)), fill= conf_gob, weight = FAC_SEL)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+                                                                                                                                                               stat = "count",
+                                                                                                                                                               position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Confianza en la Jefa de Gobierno Claudia Sheinbaum en CDMX por demarcación",
+                                                                  subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")
+
+g2
+
+table(ENSU_CB_0923$BP5_1_2, ENSU_CB_0923$conf_gob)
+
+
+g3<- ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & !is.na(conf_alc))) +  
+  aes(x = reorder(nom_cdmx, -as.numeric(BP5_1_3)), fill= conf_alc, weight = FAC_SEL)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+                                                                                                                                                               stat = "count",
+                                                                                                                                                               position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Confianza en alcaldes y alcaldesas de la CDMX por demarcación",
+                                                                  subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")
+
+g3
+
+table(ENSU_CB_0923$nom_cdmx)
+
+ENSU_CB_0923 <- ENSU_CB_0923 %>% mutate( 
+  nom_cdmx1 = factor(nom_cdmx, levels = c("IZTP", "B.JRZ", "CUAJ", "V.CAR", 
+                                          "COYO", "TLHC", "M.CONT", "TLPN", 
+                                          "A.OBR" , "AZCA","M.HGO", "GAM",
+                                          "M.ALTA", "XOCH","CUAUH", "IZTC" ))
+)
+
+
+CB_9_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+g3<- ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx1, fill= conf_alc, weight = FAC_SEL)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))), y = ..count.. ), 
+                                                                                                                                                               stat = "count",
+                                                                                                                                                               position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Confianza en alcaldes y alcaldesas de la CDMX por demarcación",
+                                                                  subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")
+
+g3
+
+g3_pp<- ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx1, fill= conf_alc_pp)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 2), '%'))), y = ..count.. ), 
+                                                                                                                                 stat = "count",
+                                                                                                                                 position = position_fill(vjust = .5), size = 3.2)+
+  theme_minimal() + 
+  theme(legend.position = "bottom")+ 
+  ggtitle("Confianza en alcaldes y alcaldesas de la CDMX por demarcación", 
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")
+
+g3_pp
+
+g3_pp_2<- ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & conf_alc_pp != "NS/NR")) +  
+  aes(x = nom_cdmx1, fill= conf_alc_pp)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 2), '%'))), y = ..count.. ), 
+                                                                                                                  stat = "count",
+                                                                                                                  position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Confianza en alcaldes y alcaldesas de la CDMX por demarcación",
+                                                                  subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")
+
+g3_pp_2
+
+
+#Replicado con datos crudos (a 2 decimales)#
+g3_pp_3<- ggplot(subset(ENSU_CB_0923,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx1, fill= conf_alc_pp)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 2), '%'))), y = ..count.. ), 
+                                                                                                                  stat = "count",
+                                                                                                                  position = position_fill(vjust = .5), size = 3.2)+ 
+  theme_minimal() + 
+  theme(legend.position = "bottom")+ 
+  ggtitle("Confianza en alcaldes y alcaldesas de la CDMX por demarcación",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")
+
+g3_pp_3
+
+?geom_bar
+
+#Sin decimales#
+g3_pp_4<- ggplot(subset(ENSU_CB_0923,  NOM_ENT == "CIUDAD DE MEXICO" & conf_alc_pp != "NS/NR")) +  
+  aes(x = nom_cdmx1, fill= conf_alc_pp)+ geom_bar(position = "fill") + labs( y = "", x = "", fill = "")+geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 0), '%'))), y = ..count.. ), 
+                                                                                                                  stat = "count",
+                                                                                                                  position = position_fill(vjust = .5), size = 3.2
+  )+ theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Confianza en alcaldes y alcaldesas de la CDMX por demarcación",
+                                                                  subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")
+
+g3_pp_4
+
+#Recodificar variable para las gráficas (INCOMPLETO)
+
+ENSU_CB_0923 <- ENSU_CB_0923 %>% mutate(
+  conf_alc_3 = case_when(conf_alc_pp == "Confía (6 - 10)" ~ "Confía (6 - 10)",
+                         conf_alc_pp == "No confía (0 - 5)" ~ NA)
+    )
+
+
+
+#Perceción de seguridad#
+
+
+
+ENSU_CB_0923<- ENSU_CB_0923 %>%mutate(
+  BP1_1 = recode(BP1_1, 
+                 `1` = "Seguro",
+                 `2` = "Inseguro",
+                 `9` = NA_character_))
+
+summarytools::freq(ENSU_CB_0923$BP1_1, order = "freq")
+
+table(ENSU_CB_0923$nom_cdmx)
+
+ENSU_CB_0923 <- ENSU_CB_0923 %>% mutate( 
+  nom_cdmx2 = factor(nom_cdmx, levels = c("IZTP", "XOCH", "GAM", "IZTC", "TLHC", 
+                                          "AZCA", "A.OBR", "CUAUH", "M.CONT", "M.ALTA" , "V.CAR",
+                                          "TLPN","COYO", "M.HGO", "CUAJ", "B.JRZ"))
+)
+
+table(ENSU_CB_0923$BP1_1)
+
+summarytools::freq(ENSU_CB_0923$BP1_1)
+
+ENSU_CB_0923<- ENSU_CB_0923 %>%mutate(
+  BP1_1 = recode(BP1_1, 
+                 `1` = "Seguro",
+                 `2` = "Inseguro",
+                 `9` = NA_character_))
+
+
+ENSU_CB_0923 <- ENSU_CB_0923 %>% mutate( 
+  nom_cdmx2 = factor(nom_cdmx, levels = c("TLHC", "XOCH", "IZTP", "IZTC", "TLPN", "CUAUH",  
+                                          "AZCA", "GAM", "A.OBR", "M.CONT", "M.ALTA" , "V.CAR",
+                                          "COYO", "M.HGO", "CUAJ", "B.JRZ"))
+)
+
+CB_9_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+
+g4<- ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx2, fill= BP1_1, weight = FAC_SEL) +geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en CDMX por demarcación", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")
+
+g4
+
+
+g5<- ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx2, fill= BP1_1, weight = FAC_SEL) +geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en CDMX por demarcación", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")
+
+g5
+
+
+
+##Percepción de seguridad por sexo##
+ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx2== "IZTP")) +  
+  aes(x = nom_cdmx2, fill= BP1_1, weight = FAC_SEL)+ geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Iztapalapa: Percepción de inseguridad en la demarcación por sexo",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")+
+  facet_grid(~SEXO, margins = TRUE, labeller = as_labeller(c("1" = "Hombres", "2" = "Mujeres", "(all)" = "Total")))+ 
+  theme(axis.text.x = element_blank())
+
+
+##Percepción de seguridad por sexo##
+ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx2== "IZTP")) +  
+  aes(x = nom_cdmx2, fill= BP1_1)+ geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Iztapalapa: Percepción de inseguridad en la demarcación por sexo",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")+
+  facet_grid(~SEXO, margins = TRUE, labeller = as_labeller(c("1" = "Hombres", "2" = "Mujeres", "(all)" = "Total")))+ 
+  theme(axis.text.x = element_blank())
+
+
+
+ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx2, fill= BP1_1, weight = FAC_SEL)+ geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Iztapalapa: Percepción de inseguridad en la demarcación",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")
+
+
+#Comparativos 2022 - 20223##
+
+
+
+ENSU_CB_0923 <- ENSU_CB_0923 %>%
+  mutate_at(vars(starts_with('BP1_2_')), 
+            ~recode(., '1' = 'Seguro(a)', 
+                    "2" = "Inseguro(a)" ,
+                    "3" = "No aplica",
+                    "9" = "NS/NR"))%>%
+  mutate_at(vars(starts_with('BP1_2_')),
+            ~factor(., levels = c("Inseguro(a)",
+                                  "Seguro(a)",
+                                  "No aplica",
+                                  "NS/NR"))
+  )
+
+table(ENSU_CB_0923$BP1_2_01)
+
+table(ENSU_CB_0923$BP1_2_02)
+
+table(ENSU_CB_0923$BP1_2_08)
+
+table(ENSU_CB_0923$BP1_2_09)
+
+CB_9_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+
+###Percepción de seguridad por lugar###
+
+
+
+gcasa<-ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx2== "IZTP")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_01)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Casa")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcasa
+
+gtrabajo<-ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx2== "IZTP" & BP1_2_02 != "No aplica" & BP1_2_02 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_02) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Trabajo")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtrabajo
+
+gCALLES<-ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx2== "IZTP" & BP1_2_03 != "No aplica" & BP1_2_03 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_03)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Calles")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gCALLES
+
+gESCUELA<-ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx2== "IZTP" & BP1_2_04 != "No aplica" & BP1_2_04 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_04)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Escuela")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gESCUELA
+
+
+gmercado<-ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx2== "IZTP" & BP1_2_05 != "No aplica" & BP1_2_05 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_05)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Mercado")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gmercado
+
+
+gcentrocomercial<-ggsurvey(subset(CB_9_23,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx2== "IZTP" & 
+                                BP1_2_06 != "No aplica" & BP1_2_06 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_06)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Centro de salud")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+gcentrocomercial
+
+
+gbanco<-ggsurvey(subset(CB_9_23,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx2== "IZTP" & 
+                                BP1_2_07 != "No aplica"& BP1_2_07 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_07)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Banco")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gbanco
+
+
+gcajero<-ggsurvey(subset(CB_9_23,  
+                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                          nom_cdmx2== "IZTP" & 
+                          BP1_2_08 != "No aplica" & BP1_2_08 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_08)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Cajero automático")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcajero
+
+
+gtransp<-ggsurvey(subset(CB_9_23,  
+                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                           nom_cdmx2== "IZTP" & 
+                           BP1_2_09 != "No aplica" & BP1_2_09 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_09) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Transporte público")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtransp
+
+
+gauto<-ggsurvey(subset(CB_9_23,  
+                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                           nom_cdmx2== "IZTP" & 
+                           BP1_2_10 != "No aplica" & BP1_2_10 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_10)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Automóvil")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gauto
+
+
+
+gcarret<-ggsurvey(subset(CB_9_23,  
+                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                         nom_cdmx2== "IZTP" & 
+                         BP1_2_11 != "No aplica"& BP1_2_11 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_11)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Carretera")+
+    theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcarret
+
+
+grecre<-ggsurvey(subset(CB_9_23,  
+                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                           nom_cdmx2== "IZTP" & 
+                           BP1_2_12 != "No aplica" & BP1_2_12 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_2_12)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Parques y centros recreativos")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+grecre
+
+
+figure <- ggarrange(gcasa, gtrabajo, gCALLES, gESCUELA,
+                    gmercado, gcentrocomercial, gbanco, gcajero,
+                    gtransp, gauto,gcarret, grecre,
+                    common.legend = TRUE,
+                    legend = "bottom") %>%
+  annotate_figure(top = text_grob(expression(atop(bold("Iztapalapa: Percepción de inseguridad por lugar"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, septiembre 2023")))))
+
+
+figure
+
+?ggarrange
+
+?annotate_figure()
+
+
+#Expectativa delincuencia
+
+ENSU_CB_0923 <- ENSU_CB_0923 %>%
+  mutate_at(vars(BP1_3), 
+            ~recode(., '1' = 'Mejorará', 
+                    "2" = "Seguirá igual de bien" ,
+                    "3" = "Seguirá igual de mal",
+                    "4" = "Empeorará",
+                    "9" = "NS/NR"))
+
+table(ENSU_CB_0923$BP1_3)
+
+CB_9_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+
+
+
+gexpecdel<-ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx2== "IZTP")) +  
+  aes(x = nom_cdmx2, fill= BP1_3)+ geom_bar(position = "dodge") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_dodge(width = .9), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Iztapalapa: Percepción de inseguridad en la demarcación por sexo",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")+ scale_y_continuous(labels = scales::percent_format(scale = .00007))
+gexpecdel
+
+
+
+
+#Confianza en autoridades de seguridad
+
+library(forcats)
+
+table(ENSU_CB_0923$BP1_9_1)
+
+
+#Categorizar y reordenar cateogorías
+ENSU_CB_0923 <- ENSU_CB_0923 %>%
+  mutate(across(starts_with("BP1_9_"), 
+            ~recode(., '1' = 'Mucha confianza', 
+                    "2" = "Algo de confianza" ,
+                    "3" = "Algo de desconfianza",
+                    "4" = "Mucha desconfianza",
+                    "9" = "NS/NR"))
+  )%>%
+  mutate(across(starts_with("BP1_9_"), 
+                ~factor(.,levels =c('Mucha confianza', 
+                        "Algo de confianza" ,
+                        "Algo de desconfianza",
+                        "Mucha desconfianza",
+                        "NS/NR")))
+  )
+
+
+table(ENSU_CB_0923$BP1_9_1)
+
+
+table(ENSU_CB_0923$BP1_3)
+
+CB_9_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+
+
+
+gexpecdel<-ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx2 == "IZTP")) +  
+  aes(x = nom_cdmx2, fill= BP1_3)+ geom_bar(position = "dodge") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_dodge(width = .9), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Iztapalapa: Expectativas sobre la seguridad en la demarcación",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")+ scale_y_continuous(labels = scales::percent_format(scale = .00007))
+gexpecdel
+
+#Comparativo expectativa ciudad
+gexpeccdmx<-ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx2, fill= BP1_3)+ geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Iztapalapa: Expectativas sobre la seguridad en la demarcación",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")+ 
+  scale_y_continuous(labels = scales::percent_format())
+gexpeccdmx
+
+
+
+#Incivilidades
+
+
+ENSU_CB_0923 <- ENSU_CB_0923 %>%
+  mutate_at(vars(starts_with('BP1_4_')), 
+            ~recode(., '1' = 'Sí', 
+                    "2" = "No" ,
+                    "9" = "NS/NR"))%>%
+  mutate_at(vars(starts_with('BP1_4_')),
+            ~factor(., levels = c("Sí",
+                                  "No",
+                                  "NS/NR"))
+  )
+
+table(ENSU_CB_0923$BP1_4_1)
+
+table(ENSU_CB_0923$BP1_4_2)
+
+table(ENSU_CB_0923$BP1_4_8)
+
+
+table(ENSU_CB_0923$BP1_4_9)
+
+CB_9_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+
+
+
+g_inci_vanda<-ggsurvey(subset(CB_9_23,  
+                NOM_ENT == "CIUDAD DE MEXICO" & 
+                  nom_cdmx2== "IZTP" & 
+                  BP1_4_1 != "No aplica"& BP1_4_1 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_4_1)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Vandalismo")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+g_inci_gvanda
+
+g_inci_alch<-ggsurvey(subset(CB_9_23,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx2== "IZTP" & 
+                                BP1_4_2 != "No aplica"& BP1_4_2 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_4_2)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Consumo de alcohol")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+g_inci_alch
+
+g_inci_rob<-ggsurvey(subset(CB_9_23,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx2== "IZTP" & 
+                               BP1_4_3 != "No aplica"& BP1_4_3 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_4_3)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Robos o asaltos")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+g_inci_rob
+
+g_inci_band<-ggsurvey(subset(CB_9_23,  
+                            NOM_ENT == "CIUDAD DE MEXICO" & 
+                              nom_cdmx2== "IZTP" & 
+                              BP1_4_4 != "No aplica"& BP1_4_4 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_4_4)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Bandas/pandillas")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+g_inci_band
+
+g_inci_drog<-ggsurvey(subset(CB_9_23,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx2== "IZTP" & 
+                               BP1_4_5 != "No aplica"& BP1_4_5 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_4_5)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Venta/consumo drogas")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+g_inci_drog
+
+g_inci_disp<-ggsurvey(subset(CB_9_23,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx2== "IZTP" & 
+                               BP1_4_6 != "No aplica"& BP1_4_6 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_4_6)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Disparos")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+g_inci_disp
+
+g_inci_huach<-ggsurvey(subset(CB_9_23,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx2== "IZTP" & 
+                               BP1_4_7 != "No aplica"& BP1_4_7 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_4_7)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Huachicol")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+g_inci_huach
+
+g_inci_elect<-ggsurvey(subset(CB_9_23,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx2== "IZTP" & 
+                               BP1_4_8 != "No aplica"& BP1_4_8 != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= BP1_4_8)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Tomas eléctricas irre.")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+g_inci_elect
+
+plot_inci<- ggarrange(g_inci_vanda, g_inci_alch, g_inci_rob,
+                      g_inci_band, g_inci_drog, g_inci_disp, 
+                      g_inci_huach, g_inci_elect, common.legend = TRUE,
+                      legend = "bottom") %>%
+  annotate_figure(top = text_grob(expression(atop(bold("Iztapalapa: Incivilidades presenciadas cerca de su domicilio"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, septiembre 2023")))))
+plot_inci
+
+a<-startsWith("g_inci", sorted = FALSE)
+
+ls(pattern = "g_inci", sorted = FALSE, )
+?ls
+
+ggtitle(ifelse({i}==1, "Vandalismo", ifelse({i}==2,"Consumo alcohol", ifelse({i}==3, "Robos o asaltos",
+                                                                             ifelse({i} == 4, "Bandas o pandillas",
+                                                  ifelse({i} == 5, "Venta o consumo de drogas", 
+                                                           ifelse( {i} == 6, "Disparos", ifelse({i}== 7, "Huachicol", "Tomas eléctricas irregulares"))))))))
+
+
+
+###
+
+
+table(ENSU_CB_0923$BP1_6_1)
+
+
+#LOOP para incivilidades (no funciona)#
+for (i in 1:8) {
+  p<-ggsurvey(subset(CB_9_23,  
+                  NOM_ENT == "CIUDAD DE MEXICO" & 
+                    nom_cdmx2== "IZTP", 
+                  paste0("BP1_4_",{i}) != "NS/NR")) +  
+    aes(x = nom_cdmx2, fill= paste0("BP1_4_",{i}))+ geom_bar(position = "fill") +
+    labs( y = "", x = "", fill = "")+
+    geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                  y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+    theme_minimal() + theme(legend.position = "bottom")+ 
+    ggtitle(ifelse({i}==1, "Vandalismo", ifelse({i}==2,"Consumo alcohol", ifelse({i}==3, "Robos o asaltos",
+          ifelse({i} == 4, "Bandas o pandillas", ifelse({i} == 5, "Venta o consumo de drogas", 
+          ifelse( {i} == 6, "Disparos", ifelse({i}== 7, "Huachicol", "Tomas eléctricas irregulares"))))))))+
+    theme(axis.text.x = element_blank())+
+    theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+  plot_list[[i]] = p
+
+}
+
+
+plot_list[1]
+
+plot_list = list()
+for (i in 1:8) {
+p<-ggsurvey(subset(CB_9_23,  
+                NOM_ENT == "CIUDAD DE MEXICO" & 
+                  nom_cdmx2== "IZTP" & 
+                  paste0("BP1_4_",i) != "No aplica" & paste0("BP1_4_",i) != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= paste0("BP1_4_",i))+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Vandalismo")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+plot_list[[i]] = p
+}
+
+plot_list[3]
+
+
+
+plot_list = list()
+
+make_plot<-function(num){
+  
+  
+  plot_list[[(num)]]<-ggsurvey(subset(CB_9_23,  
+                NOM_ENT == "CIUDAD DE MEXICO" & 
+                  nom_cdmx2== "IZTP" & 
+                  paste0("BP1_4_",(num)) != "No aplica" & paste0("BP1_4_",i) != "NS/NR")) +  
+  aes(x = nom_cdmx2, fill= paste0("BP1_4_",(num)))+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Vandalismo")+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+}
+
+plot_list
+
+plots <- lapply(1:8, make_plot)
+
+plots[3]
+
+ggsurvey(subset(CB_9_23,  
+                     NOM_ENT == "CIUDAD DE MEXICO" & 
+                       nom_cdmx2== "IZTP" & 
+                       BP1_4_1 != "NS/NR")) +  
+    aes(x = nom_cdmx2, fill= BP1_4_1)+ geom_bar(position = "fill") +
+    labs( y = "", x = "", fill = "")+
+    geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                  y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+    theme_minimal() + theme(legend.position = "bottom")+ 
+    ggtitle("Vandalismo")+
+    theme(axis.text.x = element_blank())+
+    theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+
+
+
+gexpeccdmx<-ggsurvey(subset(CB_9_23,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = nom_cdmx2, fill= BP1_3)+ geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Iztapalapa: Expectativas sobre la seguridad en la demarcación",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Septiembre 2023")+ 
+  scale_y_continuous(labels = scales::percent_format())
+gexpeccdmx
+
+
+
+#Cambio de hábitos
+
+
+
+ENSU_CB_0923 <- ENSU_CB_0923 %>%
+  mutate_at(vars(starts_with('BP1_2_')), 
+            ~recode(., '1' = 'Seguro(a)', 
+                    "2" = "Inseguro(a)" ,
+                    "3" = "No aplica",
+                    "9" = "NS/NR"))%>%
+  mutate_at(vars(starts_with('BP1_2_')),
+            ~factor(., levels = c("Inseguro(a)",
+                                  "Seguro(a)",
+                                  "No aplica",
+                                  "NS/NR"))
+  )
+
+table(ENSU_CB_0923$BP1_2_01)
+
+table(ENSU_CB_0923$BP1_2_02)
+
+table(ENSU_CB_0923$BP1_2_08)
+
+table(ENSU_CB_0923$BP1_2_09)
+
+CB_9_23<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB_0923, nest = T)
+
+
+
+
+
+#facet_grid(~SEXO, margins = TRUE, labeller = as_labeller(c("1" = "Hombres", "2" = "Mujeres", "(all)" = "Total")))+ 
+ # theme(axis.text.x = element_blank())
+
+
+
+
+

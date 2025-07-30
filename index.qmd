@@ -1,0 +1,207 @@
+---
+title: "Visualizador ENSU - Gobierno de la Ciudad de México"
+description: "Presentación histórica de la Encuesta Nacional de Seguridad Urbana ENSU."
+author: "Coordinación de Asesores del Gobierno de la Ciudad de México"
+subtitle: "Última actualización: Julio 2024"
+editor: visual
+---
+```{r}
+#| label: setup
+#| echo: false
+#| message: false
+#| warning: false
+#| include: false
+source("preparacion_datos.R")
+source("creacion_graficos.R")
+```
+
+## Presentación
+
+En esta página se visualizan los principales resultados de la Encuesta Nacional de Seguridad Urbana ENSU, que levanta el Instituto Nacional de Estadística, Geografía e Informática de México INEGI. Es la principal fuente de información sobre percepción de seguridad del país. También tiene información sobre confianza en autoridades, en fuerzas de seguridad, victimización, problemáticas urbanas percibidas y acoso/violencia sexual. 
+
+La ENSU es capturada trimestralmente, y es una de las pocas encuestas que tiene representación a nivel de la Ciudad de México y para cada demarcación. Esto la hace una herramienta importante para monitorear, orientar y dar seguimiento a las políticas públicas en Seguridad.
+
+Esta página fue elaborada por la Coordinación de Asesores de la Ciudad de México.
+
+## Percepción de seguridad
+
+### Percepción de inseguridad por demarcación y Ciudad de México
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: inseg-hist
+#| fig-height: 9
+
+g_inseguro
+```
+
+### Percepción de inseguridad por lugar
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: inseg-lugar
+#| fig-height: 9
+
+g_inseg_lugar
+```
+
+## Incivilidades
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: inciv
+#| fig-height: 9
+
+plot_inci_CDMX_hist
+```
+
+## Acoso y violencia sexual
+
+Esta batería de preguntas se consulta los segundos y cuartos trimestres (junio y diciembre).
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: acoso-cdmx
+#| fig-height: 9
+
+plot_aco_CDMX_hist
+```
+
+
+Ahora se muestran los incidentes de acoso y violencia sexual usando el mismo agrupamiento que el INEGI.
+
+### Intimidación 
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: intimi-cdmx
+#| fig-height: 9
+
+g_acos_intimi_hist
+```
+Incluye piropos, llamadas, mensajes o contenido sexual no solicitado u ofensivo por redes
+
+### Abuso sexual
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: abuso-cdmx
+#| fig-height: 9
+
+g_acos_abuso_hist
+```
+Incluye tocamientos o contacto físico de índole sexual no consentida y la exposición a escenas sexuales o pornografía no consentidas.
+
+### Acoso sexual
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: acoso2-cdmx
+#| fig-height: 9
+
+g_acos_acoso_hist
+```
+Inclye la oferta de bienes, regalos u otro tipo de bienes a cambio de intercambio de índole sexual no solicitada u ofensiva.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: viola-cdmx
+#| fig-height: 9
+
+g_acos_viola_hist
+```
+Incluye la violación y el intento de violación.
+
+## Victimización
+
+Esta batería de preguntas se consulta los segundos y cuartos trimestres (junio y diciembre).
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: victi-cdmx
+#| fig-height: 9
+
+plot_vict_CDMX_hist
+```
+
+## Confianza en autoridades gubernamentales
+
+Esta batería de preguntas solo se consulta los segundos y cuartos trimestres (marzo y septiembre).
+
+### Confianza en el Gobierno Federal (antes "Presidencia")
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: conf-pres-cdmx
+#| fig-height: 9
+
+g_conf_pres
+```
+
+### Confianza en el Gobierno de la Ciudad (antes "Jefatura de Gobierno")
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: conf-gob-cdmx
+#| fig-height: 9
+
+g_conf_gob
+```
+
+### Confianza en la Alcaldía
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: conf-alc-cdmx
+#| fig-height: 9
+
+g_conf_alc
+```
+
+
+## Confianza en Fuerzas de Seguridad
+
+### Confianza en la Policía de la Secretaría de Seguridad de la Ciudad de México
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: conf-ssc-cdmx
+#| fig-height: 9
+
+g_conf_ssc
+```
+
+### Confianza en la Guardia Nacional
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: conf-gn-cdmx
+#| fig-height: 9
+
+g_conf_gn
+```

@@ -1,0 +1,2433 @@
+##########Agregado bases ENSU 2023 - 2024###########
+
+rm(list = ls())
+options(warn=1)
+
+#####CARGAR LIBRERÍAS############
+
+if (!require('tidyverse')) install.packages('tidyverse',dependencies = TRUE); library('tidyverse')
+if (!require('factoextra')) install.packages('factoextra', dependencies = TRUE); library('factoextra')
+if (!require('foreign')) install.packages('foreign', dependencies = TRUE); library('foreign')
+if (!require('ggplot2')) install.packages('ggplot2', dependencies = TRUE); library('ggplot2')
+if (!require('survey')) install.packages('survey', dependencies = TRUE); library('survey')
+if (!require('corrplot')) install.packages('corrplot', dependencies = TRUE); library('corrplot')
+if (!require('gtsummary')) install.packages('gtsummary', dependencies = TRUE); library('gtsummary')
+if (!require('summarytools')) install.packages('summarytools', dependencies = TRUE); library('summarytools')
+if (!require('ggsurvey')) install.packages('ggsurvey', dependencies = TRUE); library('ggsurvey')
+if (!require('questionr')) install.packages('questionr', dependencies = TRUE); library('questionr')
+if (!require('scales')) install.packages('scales', dependencies = TRUE); library('scales')
+if (!require('ggpubr')) install.packages('ggpubr', dependencies = TRUE); library('ggpubr')
+if (!require('remotes')) install.packages('remotes', dependencies = TRUE); library('remotes')
+if (!require('plotflow')) remotes::install_github("trinker/plotflow"); library("plotflow")
+if (!require('srvyr')) remotes::install_github("srvyr"); library("srvyr")
+
+
+
+#Leer R.DATA de la ENSU 2023 Y 2024#
+
+load("G:/Mi unidad/Iztapalapa/Encuestas/ENSU/03_23/BD_ENSU_0323_2.RData")
+
+ENSU_CB_0323<- ENSU_CB_0323 %>% mutate(
+  trimestre = "T1-23"
+)
+  
+load("G:/Mi unidad/Iztapalapa/Encuestas/ENSU/06_23/BD_ENSU_0623_2.RData")
+
+ENSU_CB_0623<- ENSU_CB_0623 %>% mutate(
+  trimestre = "T2-23"
+)
+
+
+load("G:/Mi unidad/Iztapalapa/Encuestas/ENSU/09_23/BD_ENSU_0923_2.RData")
+
+ENSU_CB_0923<- ENSU_CB_0923 %>% mutate(
+  trimestre = "T3-23"
+)
+
+
+load("G:/Mi unidad/Iztapalapa/Encuestas/ENSU/12_23/BD_ENSU_1223_2.RData")
+
+ENSU_CB_1223<- ENSU_CB_1223 %>% mutate(
+  trimestre = "T4-23"
+)
+
+
+load("G:/Mi unidad/Iztapalapa/Encuestas/ENSU/03_24/BD_ENSU_0324.RData")
+
+ENSU_CB_0324<- ENSU_CB_0324 %>% mutate(
+  trimestre = "T1-24"
+)
+
+
+load("G:/Mi unidad/Iztapalapa/Encuestas/ENSU/06_24/BD_ENSU_0624.RData")
+
+ENSU_CB_0624<- ENSU_CB_0624 %>% mutate(
+  trimestre = "T2-24"
+)
+
+load("G:/Mi unidad/Iztapalapa/Encuestas/ENSU/09_24/BD_ENSU_0924.RData")
+
+ENSU_CB_0924<- ENSU_CB_0924 %>% mutate(
+  trimestre = "T3-24"
+)
+
+
+mydflist <- mget(ls(pattern ="ENSU_CB_"))
+
+allNms <- unique(unlist(lapply(mydflist, names)))
+
+
+mydflist <- mget(ls(pattern ="ENSU_CB_"))
+
+allNms <- unique(unlist(lapply(mydflist, names)))
+
+
+
+ENSU_CB <- do.call(rbind,
+        c(lapply(mydflist,
+                 function(x) data.frame(c(x, sapply(setdiff(allNms, names(x)),
+                                                    function(y) NA)))),
+          make.row.names=FALSE))
+
+names(ENSU_CB)
+
+ENSU_CB <- ENSU_CB %>%
+  mutate_at(vars(starts_with('BP1_1')), 
+            ~recode(., '1' = 'Seguro(a)', 
+                    "2" = "Inseguro(a)" ,
+                    "3" = "No aplica",
+                    "9" = "NS/NR"))%>%
+  mutate_at(vars(starts_with('BP1_1')),
+            ~factor(., levels = c("Inseguro(a)",
+                                  "Seguro(a)",
+                                  "No aplica",
+                                  "NS/NR"))
+  )
+
+
+#Recodificación nombres CDMX#
+
+ENSU_CB<- ENSU_CB %>% mutate(
+  nom_cdmx = case_when(NOM_CD =="ALVARO OBREGON" ~ "A.OBR",
+                       NOM_CD =="AZCAPOTZALCO" ~ "AZCA",
+                       NOM_CD =="BENITO JUAREZ" ~ "B.JRZ",
+                       NOM_CD =="COYOACAN" ~ "COYO",
+                       NOM_CD =="CUAJIMALPA DE MORELOS" ~ "CUAJ",
+                       NOM_CD =="CUAUHTEMOC" ~ "CUAUH",
+                       NOM_CD =="GUSTAVO A. MADERO" ~ "GAM",
+                       NOM_CD =="IZTACALCO" ~ "IZTC",
+                       NOM_CD =="IZTAPALAPA" ~ "IZTP",
+                       NOM_CD =="LA MAGDALENA CONTRERAS" ~ "M.CONT",
+                       NOM_CD =="MIGUEL HIDALGO" ~ "M.HGO",
+                       NOM_CD =="MILPA ALTA" ~ "M.ALTA",
+                       NOM_CD =="TLAHUAC" ~ "TLHC",
+                       NOM_CD =="TLALPAN" ~ "TLPN",
+                       NOM_CD =="VENUSTIANO CARRANZA" ~ "V.CAR",
+                       NOM_CD =="XOCHIMILCO" ~ "XOCH",
+                       TRUE ~ NA))
+
+
+ENSU_CB <- ENSU_CB %>% mutate( 
+  nom_cdmx1 = factor(nom_cdmx, levels = c( "XOCH", "AZCA",  "TLHC", "IZTC", 
+                                           "IZTP", "A.OBR", "CUAUH", "GAM", 
+                                           "M.CONT", "V.CAR", "M.ALTA", "TLPN", 
+                                           "COYO", "M.HGO", "CUAJ", "B.JRZ"))
+)
+
+
+ENSU_CB <- ENSU_CB %>% mutate( 
+  nom_cdmx2 = factor(nom_cdmx, levels = c("IZTP", "B.JRZ", "TLHC", "XOCH",
+                                          "IZTC", "CUAUH", "GAM", "M.CONT",
+                                          "V.CAR", "M.ALTA", "TLPN", "AZCA",
+                                          "COYO", "M.HGO", "CUAJ", "A.OBR"))
+  
+)
+
+########Diseño muestral#######
+
+options(survey.adjust.domain.lonely=TRUE)
+options(survey.lonely.psu="adjust")
+
+ENSU_CB <- ENSU_CB %>% mutate(
+  trimestre = factor(trimestre, levels = c ("T1-23", "T2-23", "T3-23",
+                                            "T4-23", "T1-24", "T2-24", "T3-24"))
+)
+
+dm_CB_agr<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB, nest = T)
+
+svyby(~factor(BP1_1), by = ~trimestre, design = subset(dm_CB_agr, CVE_ENT == "09"), na.rm.all = T, svymean, nest = F)
+
+g1<- ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO")) +  
+  aes(x = trimestre, fill= BP1_1) +geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en CDMX por trimestre y demarcación", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  facet_grid(nom_cdmx1~., margins = TRUE, labeller=label_rename_margin("CDMX"))+scale_y_continuous(labels = scales::percent_format())
+
+
+
+g1
+
+
+#Prueba#
+
+# Cargar srvyr
+library(srvyr)
+
+# Convertir el objeto survey a un objeto de diseño srvyr
+dm_srvyr <- as_survey_design(dm_CB_agr)
+
+# Calcular proporciones por demarcación, trimestre y categoría de BP1_1 utilizando srvyr
+proporciones_bp1 <- dm_srvyr %>%
+  group_by(nom_cdmx1, trimestre, BP1_1) %>%
+  summarize(proporcion = survey_mean(na.rm = TRUE))
+
+proporciones_bp1
+
+# Extraer solo la proporción de la categoría "Inseguro (a)"
+proporciones_inseguro <- proporciones_bp1 %>%
+  filter(BP1_1 == "Inseguro(a)")
+
+print(proporciones_inseguro)
+
+
+#Gráfica uno
+# Calcular el total de la Ciudad de México (incluyendo todas las demarcaciones)
+total_cdmx <- subset(dm_srvyr, NOM_ENT == "CIUDAD DE MEXICO") %>%
+  group_by(trimestre, BP1_1) %>%
+  summarize(proporcion = survey_mean(na.rm = TRUE)) %>%
+  filter(BP1_1 == "Inseguro(a)") %>%
+  mutate(nom_cdmx1 = "CDMX")
+
+total_cdmx
+
+# Combinar los resultados de las demarcaciones con el total de CDMX
+proporciones_combinadas <- bind_rows(proporciones_inseguro, total_cdmx)
+
+# Filtrar valores NA y asegurarnos de que 'nom_cdmx1' no tenga valores NA
+proporciones_combinadas <- proporciones_combinadas %>%
+  filter(!is.na(proporcion), !is.na(nom_cdmx1))  # Filtrar filas donde 'proporcion' o 'nom_cdmx1' es NA
+
+
+
+
+g_inseguro <- ggplot(proporciones_combinadas, aes(x = trimestre, y = proporcion, group = nom_cdmx1, color = nom_cdmx1)) +
+  geom_line(data = proporciones_combinadas %>% filter(nom_cdmx1 == "CDMX"), 
+            size = 1.8, show.legend = FALSE) +  # Línea para CDMX
+  geom_line(data = proporciones_combinadas %>% filter(nom_cdmx1 != "CDMX"), 
+            size = 0.8, show.legend = FALSE, alpha = 0.5) +  # Línea para las otras demarcaciones
+  geom_point(size = 2) +  # Puntos en cada trimestre
+  # Etiquetas para CDMX mostrando el porcentaje
+  geom_text_repel(data = proporciones_combinadas %>% filter(nom_cdmx1 == "CDMX"), 
+                  aes(label = scales::percent(proporcion, accuracy = 0.1)), 
+                  vjust = -0.5, size = 3.5, fontface = "bold", color = "black", 
+                  max.overlaps = Inf) +  # Permitir más superposiciones
+  # Etiquetas para cada demarcación en el último trimestre
+  geom_text_repel(data = proporciones_combinadas %>% filter(trimestre == levels(proporciones_combinadas$trimestre)[length(levels(proporciones_combinadas$trimestre))]), 
+                  aes(label = nom_cdmx1), 
+                  vjust = -0.5, size = 3, color = "black") +
+  # Eliminar la etiqueta duplicada para CDMX en el último trimestre
+  labs(x = "Trimestre", y = "", color = "") +
+  ggtitle("Proporción de percepción de inseguridad en la Ciudad de México por Trimestre y Demarcación",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2025") +
+  theme_minimal() +
+  theme(legend.position = "none") +  # Eliminar leyenda
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(caption = "Incluye la no respuesta para el cálculo de los porcentajes")
+
+# Mostrar el gráfico
+print(g_inseguro)
+
+
+
+
+g2<- ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "IZTP")) +  
+  aes(x = trimestre, fill= BP1_1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en IZTAPALAPA por trimestre", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+g2
+
+
+g2_vcar<- ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "V.CAR")) +  
+  aes(x = trimestre, fill= BP1_1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en Venustiano Carranza por trimestre", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+g2_vcar
+
+g2_TLHC<- ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "TLHC")) +  
+  aes(x = trimestre, fill= BP1_1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en TLAHUAC por trimestre", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+g2_TLHC
+
+g2_M.ALTA<- ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "M.ALTA")) +  
+  aes(x = trimestre, fill= BP1_1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en MILPA ALTA por trimestre", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+g2_M.ALTA
+
+g2_TLPN<- ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "TLPN")) +  
+  aes(x = trimestre, fill= BP1_1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en TLALPAN por trimestre", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+g2_TLPN
+
+g2_XOCH<- ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "XOCH")) +  
+  aes(x = trimestre, fill= BP1_1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Percepción seguridad en XOCHIMILCO por trimestre", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+g2_XOCH
+
+
+######Recodificación variables percepción inseg lugar"######
+ENSU_CB <- ENSU_CB %>%
+  mutate_at(vars(starts_with('BP1_2_')), 
+            ~recode(., '1' = 'Seguro(a)', 
+                    "2" = "Inseguro(a)" ,
+                    "3" = "No aplica",
+                    "9" = "NS/NR"))%>%
+  mutate_at(vars(starts_with('BP1_2_')),
+            ~factor(., levels = c("Inseguro(a)",
+                                  "Seguro(a)",
+                                  "No aplica",
+                                  "NS/NR"))
+  )
+
+
+
+
+dm_CB_agr<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB, nest = T)
+
+###########Inseg por lugar IZTP hist##############
+gcasa_IZTP<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "IZTP")) +  
+  aes(x = trimestre, fill= BP1_2_01)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Casa")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcasa_IZTP
+
+gtrabajo_IZTP<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "IZTP" & BP1_2_02 != "No aplica" & BP1_2_02 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_02) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Trabajo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtrabajo_IZTP
+
+gCALLES_IZTP<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "IZTP" & BP1_2_03 != "No aplica" & BP1_2_03 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_03)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Calles")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gCALLES_IZTP
+
+gESCUELA_IZTP<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "IZTP" & BP1_2_04 != "No aplica" & BP1_2_04 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_04)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Escuela")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gESCUELA_IZTP
+
+
+gmercado_IZTP<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "IZTP" & BP1_2_05 != "No aplica" & BP1_2_05 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_05)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Mercado")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gmercado_IZTP
+
+
+gcentrocomercial_IZTP<-ggsurvey(subset(dm_CB_agr,  
+                                  NOM_ENT == "CIUDAD DE MEXICO" & 
+                                    nom_cdmx1== "IZTP" & 
+                                    BP1_2_06 != "No aplica" & BP1_2_06 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_06)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Centro de salud")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+gcentrocomercial_IZTP
+
+
+gbanco_IZTP<-ggsurvey(subset(dm_CB_agr,  
+                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                          nom_cdmx1== "IZTP" & 
+                          BP1_2_07 != "No aplica"& BP1_2_07 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_07)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Banco")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gbanco_IZTP
+
+
+gcajero_IZTP<-ggsurvey(subset(dm_CB_agr,  
+                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                           nom_cdmx1== "IZTP" & 
+                           BP1_2_08 != "No aplica" & BP1_2_08 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_08)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Cajero automático")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcajero_IZTP
+
+
+gtransp_IZTP<-ggsurvey(subset(dm_CB_agr,  
+                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                           nom_cdmx1== "IZTP" & 
+                           BP1_2_09 != "No aplica" & BP1_2_09 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_09) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Transporte público")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtransp_IZTP
+
+gtransp_2_IZTP<-ggsurvey(subset(dm_CB_agr,  
+                           NOM_ENT == "CIUDAD DE MEXICO" & 
+                             nom_cdmx1== "IZTP" & BP1_2_09 != "No aplica")) +  
+  aes(x = trimestre, fill= BP1_2_09) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Transporte público")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtransp_2_IZTP
+
+
+gauto_IZTP<-ggsurvey(subset(dm_CB_agr,  
+                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                         nom_cdmx1== "IZTP" & 
+                         BP1_2_10 != "No aplica" & BP1_2_10 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_10)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Automóvil")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gauto_IZTP
+
+
+
+gcarret_IZTP<-ggsurvey(subset(dm_CB_agr,  
+                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                           nom_cdmx1== "IZTP" & 
+                           BP1_2_11 != "No aplica"& BP1_2_11 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_11)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Carretera")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcarret_IZTP
+
+
+grecre_IZTP<-ggsurvey(subset(dm_CB_agr,  
+                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                          nom_cdmx1== "IZTP" & 
+                          BP1_2_12 != "No aplica" & BP1_2_12 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_12)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Parques y centros recreativos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+grecre_IZTP
+
+
+figure_IZTP <- ggarrange(gcasa_IZTP, gtrabajo_IZTP, gCALLES_IZTP, gESCUELA_IZTP,
+                         gmercado_IZTP, gcentrocomercial_IZTP, gbanco, gcajero_IZTP,
+                         gtransp_IZTP, gauto_IZTP,gcarret_IZTP, grecre_IZTP,
+                         common.legend = TRUE,
+                         legend = "bottom") %>%
+  annotate_figure(top = text_grob(expression(atop(bold("Iztapalapa: Percepción de inseguridad por lugar"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las respuestas 'No aplica' y 'NS/NR' para el cálculo de los porcentajes "))))
+
+
+figure_IZTP
+
+
+###########Inseg por lugar V.CAR hist##############
+
+gcasa_V.CAR<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "V.CAR")) +  
+  aes(x = trimestre, fill= BP1_2_01)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Casa")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcasa_V.CAR
+
+gtrabajo_V.CAR<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "V.CAR" & BP1_2_02 != "No aplica" & BP1_2_02 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_02) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Trabajo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtrabajo_V.CAR
+
+gCALLES_V.CAR<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "V.CAR" & BP1_2_03 != "No aplica" & BP1_2_03 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_03)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Calles")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gCALLES_V.CAR
+
+gESCUELA_V.CAR<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "V.CAR" & BP1_2_04 != "No aplica" & BP1_2_04 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_04)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Escuela")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gESCUELA_V.CAR
+
+
+gmercado_V.CAR<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "V.CAR" & BP1_2_05 != "No aplica" & BP1_2_05 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_05)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Mercado")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gmercado_V.CAR
+
+
+gcentrocomercial_V.CAR<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "V.CAR" & 
+                                         BP1_2_06 != "No aplica" & BP1_2_06 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_06)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Centro de salud")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+gcentrocomercial_V.CAR
+
+
+gbanco_V.CAR<-ggsurvey(subset(dm_CB_agr,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx1== "V.CAR" & 
+                               BP1_2_07 != "No aplica"& BP1_2_07 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_07)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Banco")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gbanco_V.CAR
+
+
+gcajero_V.CAR<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "V.CAR" & 
+                                BP1_2_08 != "No aplica" & BP1_2_08 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_08)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Cajero automático")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcajero_V.CAR
+
+
+gtransp_V.CAR<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "V.CAR" & 
+                                BP1_2_09 != "No aplica" & BP1_2_09 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_09) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Transporte público")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtransp_V.CAR
+
+gtransp_2_V.CAR<-ggsurvey(subset(dm_CB_agr,  
+                                NOM_ENT == "CIUDAD DE MEXICO" & 
+                                  nom_cdmx1== "V.CAR" & BP1_2_09 != "No aplica")) +  
+  aes(x = trimestre, fill= BP1_2_09) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Transporte público")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtransp_2_V.CAR
+
+
+gauto_V.CAR<-ggsurvey(subset(dm_CB_agr,  
+                            NOM_ENT == "CIUDAD DE MEXICO" & 
+                              nom_cdmx1== "V.CAR" & 
+                              BP1_2_10 != "No aplica" & BP1_2_10 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_10)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Automóvil")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gauto_V.CAR
+
+
+
+gcarret_V.CAR<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "V.CAR" & 
+                                BP1_2_11 != "No aplica"& BP1_2_11 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_11)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Carretera")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcarret_V.CAR
+
+
+grecre_V.CAR<-ggsurvey(subset(dm_CB_agr,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx1== "V.CAR" & 
+                               BP1_2_12 != "No aplica" & BP1_2_12 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_12)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Parques y centros recreativos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+grecre_V.CAR
+
+
+figure_V.CAR <- ggarrange(gcasa_V.CAR, gtrabajo_V.CAR, gCALLES_V.CAR, gESCUELA_V.CAR,
+                         gmercado_V.CAR, gcentrocomercial_V.CAR, gbanco_V.CAR, gcajero_V.CAR,
+                         gtransp_V.CAR, gauto_V.CAR,gcarret_V.CAR, grecre_V.CAR,
+                         common.legend = TRUE,
+                         legend = "bottom") %>%
+  annotate_figure(top = text_grob(expression(atop(bold("Venustiano Carranza: Percepción de inseguridad por lugar"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las respuestas 'No aplica' y 'NS/NR' para el cálculo de los porcentajes "))))
+
+
+figure_V.CAR
+
+
+###########Inseg por lugar TLHC hist##############
+
+gcasa_TLHC<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "TLHC")) +  
+  aes(x = trimestre, fill= BP1_2_01)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Casa")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcasa_TLHC
+
+gtrabajo_TLHC<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "TLHC" & BP1_2_02 != "No aplica" & BP1_2_02 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_02) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Trabajo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtrabajo_TLHC
+
+gCALLES_TLHC<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "TLHC" & BP1_2_03 != "No aplica" & BP1_2_03 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_03)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Calles")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gCALLES_TLHC
+
+gESCUELA_TLHC<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "TLHC" & BP1_2_04 != "No aplica" & BP1_2_04 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_04)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Escuela")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gESCUELA_TLHC
+
+
+gmercado_TLHC<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "TLHC" & BP1_2_05 != "No aplica" & BP1_2_05 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_05)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Mercado")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gmercado_TLHC
+
+
+gcentrocomercial_TLHC<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "TLHC" & 
+                                          BP1_2_06 != "No aplica" & BP1_2_06 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_06)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Centro de salud")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+gcentrocomercial_TLHC
+
+
+gbanco_TLHC<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "TLHC" & 
+                                BP1_2_07 != "No aplica"& BP1_2_07 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_07)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Banco")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gbanco_TLHC
+
+
+gcajero_TLHC<-ggsurvey(subset(dm_CB_agr,  
+                               NOM_ENT == "CIUDAD DE MEXICO" & 
+                                 nom_cdmx1== "TLHC" & 
+                                 BP1_2_08 != "No aplica" & BP1_2_08 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_08)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Cajero automático")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcajero_TLHC
+
+
+gtransp_TLHC<-ggsurvey(subset(dm_CB_agr,  
+                               NOM_ENT == "CIUDAD DE MEXICO" & 
+                                 nom_cdmx1== "TLHC" & 
+                                 BP1_2_09 != "No aplica" & BP1_2_09 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_09) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Transporte público")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtransp_TLHC
+
+gtransp_2_TLHC<-ggsurvey(subset(dm_CB_agr,  
+                                 NOM_ENT == "CIUDAD DE MEXICO" & 
+                                   nom_cdmx1== "TLHC" & BP1_2_09 != "No aplica")) +  
+  aes(x = trimestre, fill= BP1_2_09) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Transporte público")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtransp_2_TLHC
+
+
+gauto_TLHC<-ggsurvey(subset(dm_CB_agr,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx1== "TLHC" & 
+                               BP1_2_10 != "No aplica" & BP1_2_10 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_10)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Automóvil")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gauto_TLHC
+
+
+
+gcarret_TLHC<-ggsurvey(subset(dm_CB_agr,  
+                               NOM_ENT == "CIUDAD DE MEXICO" & 
+                                 nom_cdmx1== "TLHC" & 
+                                 BP1_2_11 != "No aplica"& BP1_2_11 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_11)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Carretera")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcarret_TLHC
+
+
+grecre_TLHC<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "TLHC" & 
+                                BP1_2_12 != "No aplica" & BP1_2_12 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_12)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Parques y centros recreativos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+grecre_TLHC
+
+
+figure_TLHC <- ggarrange(gcasa_TLHC, gtrabajo_TLHC, gCALLES_TLHC, gESCUELA_TLHC,
+                          gmercado_TLHC, gcentrocomercial_TLHC, gbanco_TLHC, gcajero_TLHC,
+                          gtransp_TLHC, gauto_TLHC,gcarret_TLHC, grecre_TLHC,
+                          common.legend = TRUE,
+                          legend = "bottom") %>%
+  annotate_figure(top = text_grob(expression(atop(bold("Tlahuac: Percepción de inseguridad por lugar"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las respuestas 'No aplica' y 'NS/NR' para el cálculo de los porcentajes "))))
+
+
+figure_TLHC
+
+###########Inseg por lugar M.ALTA hist##############
+
+gcasa_M.ALTA<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "M.ALTA" & BP1_2_02 != "No aplica" & BP1_2_02 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_01)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Casa")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcasa_M.ALTA
+
+gtrabajo_M.ALTA<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "M.ALTA" & BP1_2_02 != "No aplica" & BP1_2_02 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_02) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Trabajo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtrabajo_M.ALTA
+
+gCALLES_M.ALTA<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "M.ALTA" & BP1_2_03 != "No aplica" & BP1_2_03 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_03)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Calles")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gCALLES_M.ALTA
+
+gESCUELA_M.ALTA<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "M.ALTA" & BP1_2_04 != "No aplica" & BP1_2_04 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_04)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Escuela")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gESCUELA_M.ALTA
+
+
+gmercado_M.ALTA<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "M.ALTA" & BP1_2_05 != "No aplica" & BP1_2_05 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_05)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Mercado")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gmercado_M.ALTA
+
+
+gcentrocomercial_M.ALTA<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "M.ALTA" & 
+                                         BP1_2_06 != "No aplica" & BP1_2_06 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_06)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Centro de salud")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+gcentrocomercial_M.ALTA
+
+
+gbanco_M.ALTA<-ggsurvey(subset(dm_CB_agr,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx1== "M.ALTA" & 
+                               BP1_2_07 != "No aplica"& BP1_2_07 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_07)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Banco")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gbanco_M.ALTA
+
+
+gcajero_M.ALTA<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "M.ALTA" & 
+                                BP1_2_08 != "No aplica" & BP1_2_08 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_08)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Cajero automático")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcajero_M.ALTA
+
+
+gtransp_M.ALTA<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "M.ALTA" & 
+                                BP1_2_09 != "No aplica" & BP1_2_09 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_09) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Transporte público")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtransp_M.ALTA
+
+gauto_M.ALTA<-ggsurvey(subset(dm_CB_agr,  
+                            NOM_ENT == "CIUDAD DE MEXICO" & 
+                              nom_cdmx1== "M.ALTA" & 
+                              BP1_2_10 != "No aplica" & BP1_2_10 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_10)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Automóvil")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gauto_M.ALTA
+
+
+
+gcarret_M.ALTA<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "M.ALTA" & 
+                                BP1_2_11 != "No aplica"& BP1_2_11 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_11)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Carretera")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcarret_M.ALTA
+
+
+grecre_M.ALTA<-ggsurvey(subset(dm_CB_agr,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx1== "M.ALTA" & 
+                               BP1_2_12 != "No aplica" & BP1_2_12 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_12)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Parques y centros recreativos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+grecre_M.ALTA
+
+
+figure_M.ALTA <- ggarrange(gcasa_M.ALTA, gtrabajo_M.ALTA, gCALLES_M.ALTA, gESCUELA_M.ALTA,
+                         gmercado_M.ALTA, gcentrocomercial_M.ALTA, gbanco_M.ALTA, gcajero_M.ALTA,
+                         gtransp_M.ALTA, gauto_M.ALTA,gcarret_M.ALTA, grecre_M.ALTA,
+                         common.legend = TRUE,
+                         legend = "bottom") %>%
+  annotate_figure(top = text_grob(expression(atop(bold("MILPA ALTA: Percepción de inseguridad por lugar"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las respuestas 'No aplica' y 'NS/NR' para el cálculo de los porcentajes "))))
+
+
+figure_M.ALTA
+
+##########INSEGURIDAD LUGAR TLPN#############
+
+gcasa_TLPN<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "TLPN" & BP1_2_01 != "No aplica" & BP1_2_01 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_01)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Casa")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcasa_TLPN
+
+gtrabajo_TLPN<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "TLPN" & BP1_2_02 != "No aplica" & BP1_2_02 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_02) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Trabajo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtrabajo_TLPN
+
+gCALLES_TLPN<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "TLPN" & BP1_2_03 != "No aplica" & BP1_2_03 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_03)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Calles")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gCALLES_TLPN
+
+gESCUELA_TLPN<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "TLPN" & BP1_2_04 != "No aplica" & BP1_2_04 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_04)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Escuela")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gESCUELA_TLPN
+
+
+gmercado_TLPN<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "TLPN" & BP1_2_05 != "No aplica" & BP1_2_05 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_05)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Mercado")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gmercado_TLPN
+
+
+gcentrocomercial_TLPN<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "TLPN" & 
+                                         BP1_2_06 != "No aplica" & BP1_2_06 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_06)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Centro de salud")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+gcentrocomercial_TLPN
+
+
+gbanco_TLPN<-ggsurvey(subset(dm_CB_agr,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx1== "TLPN" & 
+                               BP1_2_07 != "No aplica"& BP1_2_07 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_07)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Banco")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gbanco_TLPN
+
+
+gcajero_TLPN<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "TLPN" & 
+                                BP1_2_08 != "No aplica" & BP1_2_08 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_08)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Cajero automático")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcajero_TLPN
+
+
+gtransp_TLPN<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "TLPN" & 
+                                BP1_2_09 != "No aplica" & BP1_2_09 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_09) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Transporte público")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtransp_TLPN
+
+gauto_TLPN<-ggsurvey(subset(dm_CB_agr,  
+                            NOM_ENT == "CIUDAD DE MEXICO" & 
+                              nom_cdmx1== "TLPN" & 
+                              BP1_2_10 != "No aplica" & BP1_2_10 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_10)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Automóvil")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gauto_TLPN
+
+
+
+gcarret_TLPN<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "TLPN" & 
+                                BP1_2_11 != "No aplica"& BP1_2_11 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_11)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Carretera")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcarret_TLPN
+
+
+grecre_TLPN<-ggsurvey(subset(dm_CB_agr,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx1== "TLPN" & 
+                               BP1_2_12 != "No aplica" & BP1_2_12 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_12)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Parques y centros recreativos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+grecre_TLPN
+
+
+figure_TLPN <- ggarrange(gcasa_TLPN, gtrabajo_TLPN, gCALLES_TLPN, gESCUELA_TLPN,
+                         gmercado_TLPN, gcentrocomercial_TLPN, gbanco_TLPN, gcajero_TLPN,
+                         gtransp_TLPN, gauto_TLPN,gcarret_TLPN, grecre_TLPN,
+                         common.legend = TRUE,
+                         legend = "bottom") %>%
+  annotate_figure(top = text_grob(expression(atop(bold("TLALPAN: Percepción de inseguridad por lugar"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las respuestas 'No aplica' y 'NS/NR' para el cálculo de los porcentajes "))))
+
+
+figure_TLPN
+
+############INSEGURIDAD POR LUGAR XOCH##############
+
+gcasa_XOCH<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "XOCH" & BP1_2_01 != "No aplica" & BP1_2_01 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_01)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Casa")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcasa_XOCH
+
+gtrabajo_XOCH<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "XOCH" & BP1_2_02 != "No aplica" & BP1_2_02 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_02) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Trabajo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtrabajo_XOCH
+
+gCALLES_XOCH<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "XOCH" & BP1_2_03 != "No aplica" & BP1_2_03 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_03)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Calles")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gCALLES_XOCH
+
+gESCUELA_XOCH<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "XOCH" & BP1_2_04 != "No aplica" & BP1_2_04 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_04)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Escuela")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gESCUELA_XOCH
+
+
+gmercado_XOCH<-ggsurvey(subset(dm_CB_agr,  NOM_ENT == "CIUDAD DE MEXICO" & nom_cdmx1== "XOCH" & BP1_2_05 != "No aplica" & BP1_2_05 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_05)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Mercado")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gmercado_XOCH
+
+
+gcentrocomercial_XOCH<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "XOCH" & 
+                                         BP1_2_06 != "No aplica" & BP1_2_06 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_06)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Centro de salud")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+gcentrocomercial_XOCH
+
+
+gbanco_XOCH<-ggsurvey(subset(dm_CB_agr,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx1== "XOCH" & 
+                               BP1_2_07 != "No aplica"& BP1_2_07 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_07)+  geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Banco")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gbanco_XOCH
+
+
+gcajero_XOCH<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "XOCH" & 
+                                BP1_2_08 != "No aplica" & BP1_2_08 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_08)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Cajero automático")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcajero_XOCH
+
+
+gtransp_XOCH<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "XOCH" & 
+                                BP1_2_09 != "No aplica" & BP1_2_09 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_09) + geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Transporte público")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gtransp_XOCH
+
+gauto_XOCH<-ggsurvey(subset(dm_CB_agr,  
+                            NOM_ENT == "CIUDAD DE MEXICO" & 
+                              nom_cdmx1== "XOCH" & 
+                              BP1_2_10 != "No aplica" & BP1_2_10 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_10)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Automóvil")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gauto_XOCH
+
+
+
+gcarret_XOCH<-ggsurvey(subset(dm_CB_agr,  
+                              NOM_ENT == "CIUDAD DE MEXICO" & 
+                                nom_cdmx1== "XOCH" & 
+                                BP1_2_11 != "No aplica"& BP1_2_11 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_11)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Carretera")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+gcarret_XOCH
+
+
+grecre_XOCH<-ggsurvey(subset(dm_CB_agr,  
+                             NOM_ENT == "CIUDAD DE MEXICO" & 
+                               nom_cdmx1== "XOCH" & 
+                               BP1_2_12 != "No aplica" & BP1_2_12 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_2_12)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Parques y centros recreativos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())
+
+grecre_XOCH
+
+
+figure_XOCH <- ggarrange(gcasa_XOCH, gtrabajo_XOCH, gCALLES_XOCH, gESCUELA_XOCH,
+                         gmercado_XOCH, gcentrocomercial_XOCH, gbanco_XOCH, gcajero_XOCH,
+                         gtransp_XOCH, gauto_XOCH,gcarret_XOCH, grecre_XOCH,
+                         common.legend = TRUE,
+                         legend = "bottom") %>%
+  annotate_figure(top = text_grob(expression(atop(bold("XOCHIMILCO: Percepción de inseguridad por lugar"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las respuestas 'No aplica' y 'NS/NR' para el cálculo de los porcentajes "))))
+
+
+figure_XOCH
+
+
+
+######INCIVILIDADES#####
+
+ENSU_CB <- ENSU_CB %>%
+  mutate_at(vars(starts_with('BP1_4_')), 
+            ~recode(., '1' = 'Sí', 
+                    "2" = "No" ,
+                    "9" = "NS/NR"))%>%
+  mutate_at(vars(starts_with('BP1_4_')),
+            ~factor(., levels = c("Sí",
+                                  "No",
+                                  "NS/NR"))
+  )
+
+dm_CB_agr<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB, nest = T)
+
+
+ #Iztapalapa#
+g_inci_vanda_IZTP_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "IZTP" & 
+                                          BP1_4_1 != "No aplica"& BP1_4_1 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_1)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Vandalismo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_vanda_IZTP_hist
+
+g_inci_alch_IZTP_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "IZTP" & 
+                                         BP1_4_2 != "No aplica"& BP1_4_2 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_2)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Consumo de alcohol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_alch_IZTP_hist
+
+g_inci_rob_IZTP_hist<-ggsurvey(subset(dm_CB_agr,  
+                                      NOM_ENT == "CIUDAD DE MEXICO" & 
+                                        nom_cdmx1== "IZTP" & 
+                                        BP1_4_3 != "No aplica"& BP1_4_3 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_3)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Robos o asaltos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_rob_IZTP_hist
+
+g_inci_band_IZTP_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "IZTP" & 
+                                         BP1_4_4 != "No aplica"& BP1_4_4 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_4)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Bandas/pandillas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_band_IZTP_hist
+
+g_inci_drog_IZTP_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "IZTP" & 
+                                         BP1_4_5 != "No aplica"& BP1_4_5 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_5)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Venta/consumo drogas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_drog_IZTP_hist
+
+g_inci_disp_IZTP_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "IZTP" & 
+                                         BP1_4_6 != "No aplica"& BP1_4_6 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_6)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Disparos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_disp_IZTP_hist
+
+g_inci_huach_IZTP_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "IZTP" & 
+                                          BP1_4_7 != "No aplica"& BP1_4_7 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_7)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Huachicol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_huach_IZTP_hist
+
+g_inci_elect_IZTP_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "IZTP" & 
+                                          BP1_4_8 != "No aplica"& BP1_4_8 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_8)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Tomas eléctricas irre.")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_elect_IZTP_hist
+
+plot_inci_IZTP_hist<- ggarrange(g_inci_vanda_IZTP_hist, g_inci_alch_IZTP_hist, g_inci_rob_IZTP_hist,
+                                g_inci_band_IZTP_hist, g_inci_drog_IZTP_hist, g_inci_disp_IZTP_hist, 
+                                g_inci_huach_IZTP_hist, g_inci_elect_IZTP_hist, common.legend = TRUE,
+                                legend = "bottom", ncol = 4, nrow = 2) %>%
+  annotate_figure(top = text_grob(expression(atop(bold("Iztapalapa: Incivilidades de las que tuvo referencia o presenció cerca de su domicilio"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las no respuesta para el cálculo de los porcentajes "))))
+
+plot_inci_IZTP_hist
+
+
+###Venustiano Carranza###
+
+g_inci_vanda_V.CAR_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "V.CAR" & 
+                                          BP1_4_1 != "No aplica"& BP1_4_1 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_1)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Vandalismo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_vanda_V.CAR_hist
+
+g_inci_alch_V.CAR_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "V.CAR" & 
+                                         BP1_4_2 != "No aplica"& BP1_4_2 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_2)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Consumo de alcohol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_alch_V.CAR_hist
+
+g_inci_rob_V.CAR_hist<-ggsurvey(subset(dm_CB_agr,  
+                                      NOM_ENT == "CIUDAD DE MEXICO" & 
+                                        nom_cdmx1== "V.CAR" & 
+                                        BP1_4_3 != "No aplica"& BP1_4_3 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_3)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Robos o asaltos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_rob_V.CAR_hist
+
+g_inci_band_V.CAR_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "V.CAR" & 
+                                         BP1_4_4 != "No aplica"& BP1_4_4 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_4)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Bandas/pandillas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_band_V.CAR_hist
+
+g_inci_drog_V.CAR_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "V.CAR" & 
+                                         BP1_4_5 != "No aplica"& BP1_4_5 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_5)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Venta/consumo drogas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_drog_V.CAR_hist
+
+g_inci_disp_V.CAR_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "V.CAR" & 
+                                         BP1_4_6 != "No aplica"& BP1_4_6 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_6)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Disparos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_disp_V.CAR_hist
+
+g_inci_huach_V.CAR_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "V.CAR" & 
+                                          BP1_4_7 != "No aplica"& BP1_4_7 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_7)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Huachicol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_huach_V.CAR_hist
+
+g_inci_elect_V.CAR_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "V.CAR" & 
+                                          BP1_4_8 != "No aplica"& BP1_4_8 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_8)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Tomas eléctricas irre.")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_elect_V.CAR_hist
+
+plot_inci_V.CAR_hist<- ggarrange(g_inci_vanda_V.CAR_hist, g_inci_alch_V.CAR_hist, g_inci_rob_V.CAR_hist,
+                                g_inci_band_V.CAR_hist, g_inci_drog_V.CAR_hist, g_inci_disp_V.CAR_hist, 
+                                g_inci_huach_V.CAR_hist, g_inci_elect_V.CAR_hist, common.legend = TRUE,
+                                legend = "bottom", ncol = 4, nrow = 2) %>%
+  annotate_figure(top = text_grob(expression(atop(bold("Venustiano Carranza: Incivilidades de las que tuvo referencia o presenció cerca de su domicilio"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las no respuesta para el cálculo de los porcentajes "))))
+
+plot_inci_V.CAR_hist
+
+###Tlahuac###
+
+g_inci_vanda_TLHC_hist<-ggsurvey(subset(dm_CB_agr,  
+                                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                                           nom_cdmx1== "TLHC" & 
+                                           BP1_4_1 != "No aplica"& BP1_4_1 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_1)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Vandalismo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_vanda_TLHC_hist
+
+g_inci_alch_TLHC_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "TLHC" & 
+                                          BP1_4_2 != "No aplica"& BP1_4_2 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_2)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Consumo de alcohol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_alch_TLHC_hist
+
+g_inci_rob_TLHC_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "TLHC" & 
+                                         BP1_4_3 != "No aplica"& BP1_4_3 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_3)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Robos o asaltos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_rob_TLHC_hist
+
+g_inci_band_TLHC_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "TLHC" & 
+                                          BP1_4_4 != "No aplica"& BP1_4_4 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_4)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Bandas/pandillas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_band_TLHC_hist
+
+g_inci_drog_TLHC_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "TLHC" & 
+                                          BP1_4_5 != "No aplica"& BP1_4_5 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_5)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Venta/consumo drogas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_drog_TLHC_hist
+
+g_inci_disp_TLHC_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "TLHC" & 
+                                          BP1_4_6 != "No aplica"& BP1_4_6 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_6)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Disparos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_disp_TLHC_hist
+
+g_inci_huach_TLHC_hist<-ggsurvey(subset(dm_CB_agr,  
+                                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                                           nom_cdmx1== "TLHC" & 
+                                           BP1_4_7 != "No aplica"& BP1_4_7 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_7)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Huachicol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_huach_TLHC_hist
+
+g_inci_elect_TLHC_hist<-ggsurvey(subset(dm_CB_agr,  
+                                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                                           nom_cdmx1== "TLHC" & 
+                                           BP1_4_8 != "No aplica"& BP1_4_8 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_8)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Tomas eléctricas irre.")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_elect_TLHC_hist
+
+plot_inci_TLHC_hist<- ggarrange(g_inci_vanda_TLHC_hist, g_inci_alch_TLHC_hist, g_inci_rob_TLHC_hist,
+                                 g_inci_band_TLHC_hist, g_inci_drog_TLHC_hist, g_inci_disp_TLHC_hist, 
+                                 g_inci_huach_TLHC_hist, g_inci_elect_TLHC_hist, common.legend = TRUE,
+                                 legend = "bottom", ncol = 4, nrow = 2) %>%
+  annotate_figure(top = text_grob(expression(atop(bold("Tlahuac: Incivilidades de las que tuvo referencia o presenció cerca de su domicilio"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las no respuesta para el cálculo de los porcentajes "))))
+
+plot_inci_TLHC_hist
+
+
+###MILPA ALTA###
+
+g_inci_vanda_M.ALTA_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "M.ALTA" & 
+                                          BP1_4_1 != "No aplica"& BP1_4_1 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_1)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Vandalismo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_vanda_M.ALTA_hist
+
+g_inci_alch_M.ALTA_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "M.ALTA" & 
+                                         BP1_4_2 != "No aplica"& BP1_4_2 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_2)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Consumo de alcohol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_alch_M.ALTA_hist
+
+g_inci_rob_M.ALTA_hist<-ggsurvey(subset(dm_CB_agr,  
+                                      NOM_ENT == "CIUDAD DE MEXICO" & 
+                                        nom_cdmx1== "M.ALTA" & 
+                                        BP1_4_3 != "No aplica"& BP1_4_3 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_3)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Robos o asaltos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_rob_M.ALTA_hist
+
+g_inci_band_M.ALTA_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "M.ALTA" & 
+                                         BP1_4_4 != "No aplica"& BP1_4_4 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_4)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Bandas/pandillas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_band_M.ALTA_hist
+
+g_inci_drog_M.ALTA_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "M.ALTA" & 
+                                         BP1_4_5 != "No aplica"& BP1_4_5 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_5)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Venta/consumo drogas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_drog_M.ALTA_hist
+
+g_inci_disp_M.ALTA_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "M.ALTA" & 
+                                         BP1_4_6 != "No aplica"& BP1_4_6 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_6)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Disparos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_disp_M.ALTA_hist
+
+g_inci_huach_M.ALTA_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "M.ALTA" & 
+                                          BP1_4_7 != "No aplica"& BP1_4_7 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_7)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Huachicol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_huach_M.ALTA_hist
+
+g_inci_elect_M.ALTA_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "M.ALTA" & 
+                                          BP1_4_8 != "No aplica"& BP1_4_8 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_8)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Tomas eléctricas irre.")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_elect_M.ALTA_hist
+
+plot_inci_M.ALTA_hist<- ggarrange(g_inci_vanda_M.ALTA_hist, g_inci_alch_M.ALTA_hist, g_inci_rob_M.ALTA_hist,
+                                g_inci_band_M.ALTA_hist, g_inci_drog_M.ALTA_hist, g_inci_disp_M.ALTA_hist, 
+                                g_inci_huach_M.ALTA_hist, g_inci_elect_M.ALTA_hist, common.legend = TRUE,
+                                legend = "bottom", ncol = 4, nrow = 2) %>%
+  annotate_figure(top = text_grob(expression(atop(bold("MILPA ALTA: Incivilidades de las que tuvo referencia o presenció cerca de su domicilio"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las no respuesta para el cálculo de los porcentajes "))))
+
+plot_inci_M.ALTA_hist
+
+
+####INCIVILIDADES TLALPAN####
+
+g_inci_vanda_TLPN_hist<-ggsurvey(subset(dm_CB_agr,  
+                                          NOM_ENT == "CIUDAD DE MEXICO" & 
+                                            nom_cdmx1== "TLPN" & 
+                                            BP1_4_1 != "No aplica"& BP1_4_1 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_1)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Vandalismo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_vanda_TLPN_hist
+
+g_inci_alch_TLPN_hist<-ggsurvey(subset(dm_CB_agr,  
+                                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                                           nom_cdmx1== "TLPN" & 
+                                           BP1_4_2 != "No aplica"& BP1_4_2 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_2)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Consumo de alcohol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_alch_TLPN_hist
+
+g_inci_rob_TLPN_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "TLPN" & 
+                                          BP1_4_3 != "No aplica"& BP1_4_3 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_3)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Robos o asaltos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_rob_TLPN_hist
+
+g_inci_band_TLPN_hist<-ggsurvey(subset(dm_CB_agr,  
+                                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                                           nom_cdmx1== "TLPN" & 
+                                           BP1_4_4 != "No aplica"& BP1_4_4 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_4)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Bandas/pandillas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_band_TLPN_hist
+
+g_inci_drog_TLPN_hist<-ggsurvey(subset(dm_CB_agr,  
+                                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                                           nom_cdmx1== "TLPN" & 
+                                           BP1_4_5 != "No aplica"& BP1_4_5 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_5)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Venta/consumo drogas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_drog_TLPN_hist
+
+g_inci_disp_TLPN_hist<-ggsurvey(subset(dm_CB_agr,  
+                                         NOM_ENT == "CIUDAD DE MEXICO" & 
+                                           nom_cdmx1== "TLPN" & 
+                                           BP1_4_6 != "No aplica"& BP1_4_6 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_6)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Disparos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_disp_TLPN_hist
+
+g_inci_huach_TLPN_hist<-ggsurvey(subset(dm_CB_agr,  
+                                          NOM_ENT == "CIUDAD DE MEXICO" & 
+                                            nom_cdmx1== "TLPN" & 
+                                            BP1_4_7 != "No aplica"& BP1_4_7 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_7)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Huachicol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_huach_TLPN_hist
+
+g_inci_elect_TLPN_hist<-ggsurvey(subset(dm_CB_agr,  
+                                          NOM_ENT == "CIUDAD DE MEXICO" & 
+                                            nom_cdmx1== "TLPN" & 
+                                            BP1_4_8 != "No aplica"& BP1_4_8 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_8)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Tomas eléctricas irre.")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_elect_TLPN_hist
+
+plot_inci_TLPN_hist<- ggarrange(g_inci_vanda_TLPN_hist, g_inci_alch_TLPN_hist, g_inci_rob_TLPN_hist,
+                                  g_inci_band_TLPN_hist, g_inci_drog_TLPN_hist, g_inci_disp_TLPN_hist, 
+                                  g_inci_huach_TLPN_hist, g_inci_elect_TLPN_hist, common.legend = TRUE,
+                                  legend = "bottom", ncol = 4, nrow = 2) %>%
+  annotate_figure(top = text_grob(expression(atop(bold("TLALPAN: Incivilidades de las que tuvo referencia o presenció cerca de su domicilio"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las no respuesta para el cálculo de los porcentajes "))))
+
+plot_inci_TLPN_hist
+
+#######INCIVILIDADES XOCHIMILCO#######
+
+g_inci_vanda_XOCH_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "XOCH" & 
+                                          BP1_4_1 != "No aplica"& BP1_4_1 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_1)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Vandalismo")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_vanda_XOCH_hist
+
+g_inci_alch_XOCH_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "XOCH" & 
+                                         BP1_4_2 != "No aplica"& BP1_4_2 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_2)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Consumo de alcohol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_alch_XOCH_hist
+
+g_inci_rob_XOCH_hist<-ggsurvey(subset(dm_CB_agr,  
+                                      NOM_ENT == "CIUDAD DE MEXICO" & 
+                                        nom_cdmx1== "XOCH" & 
+                                        BP1_4_3 != "No aplica"& BP1_4_3 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_3)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Robos o asaltos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_rob_XOCH_hist
+
+g_inci_band_XOCH_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "XOCH" & 
+                                         BP1_4_4 != "No aplica"& BP1_4_4 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_4)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Bandas/pandillas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_band_XOCH_hist
+
+g_inci_drog_XOCH_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "XOCH" & 
+                                         BP1_4_5 != "No aplica"& BP1_4_5 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_5)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Venta/consumo drogas")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_drog_XOCH_hist
+
+g_inci_disp_XOCH_hist<-ggsurvey(subset(dm_CB_agr,  
+                                       NOM_ENT == "CIUDAD DE MEXICO" & 
+                                         nom_cdmx1== "XOCH" & 
+                                         BP1_4_6 != "No aplica"& BP1_4_6 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_6)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Disparos")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_disp_XOCH_hist
+
+g_inci_huach_XOCH_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "XOCH" & 
+                                          BP1_4_7 != "No aplica"& BP1_4_7 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_7)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Huachicol")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_huach_XOCH_hist
+
+g_inci_elect_XOCH_hist<-ggsurvey(subset(dm_CB_agr,  
+                                        NOM_ENT == "CIUDAD DE MEXICO" & 
+                                          nom_cdmx1== "XOCH" & 
+                                          BP1_4_8 != "No aplica"& BP1_4_8 != "NS/NR")) +  
+  aes(x = trimestre, fill= BP1_4_8)+ geom_bar(position = "fill") +
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Tomas eléctricas irre.")+
+  theme(plot.title = element_text(hjust = .5))+ scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+g_inci_elect_XOCH_hist
+
+plot_inci_XOCH_hist<- ggarrange(g_inci_vanda_XOCH_hist, g_inci_alch_XOCH_hist, g_inci_rob_XOCH_hist,
+                                g_inci_band_XOCH_hist, g_inci_drog_XOCH_hist, g_inci_disp_XOCH_hist, 
+                                g_inci_huach_XOCH_hist, g_inci_elect_XOCH_hist, common.legend = TRUE,
+                                legend = "bottom", ncol = 4, nrow = 2) %>%
+  annotate_figure(top = text_grob(expression(atop(bold("XOCHIMILCO: Incivilidades de las que tuvo referencia o presenció cerca de su domicilio"), 
+                                                  scriptstyle("INEGI, Encuesta Nacional de Seguridad Urbana, Junio 2024")))))%>%
+  annotate_figure(bottom = text_grob(expression(scriptstyle("No se tomó en cuenta las no respuesta para el cálculo de los porcentajes "))))
+
+plot_inci_XOCH_hist
+
+
+#####Historico lugar por demarcacion CDMX##########
+
+
+
+#####Desempeño gubernamental histórico#########
+
+ENSU_CB <- ENSU_CB%>%
+  mutate(
+    BP3_2= recode( BP3_2, 
+                   '1' = 'Muy efectivo', 
+                   "2" = "Algo efectivo" ,
+                   "3" = "Poco efectivo",
+                   "4" = "Nada efectivo",
+                   "9" = NA_character_)
+  )%>%
+  mutate(
+    BP3_2= factor(BP3_2, levels =c('Muy efectivo', 
+                                   "Algo efectivo" ,
+                                   "Poco efectivo",
+                                   "Nada efectivo"))
+  )
+
+
+
+ENSU_CB <- ENSU_CB %>%
+  mutate(
+    desemp_gub1= recode( BP3_2, 
+                         'Muy efectivo' = 'Muy efectivo o algo efectivo', 
+                         "Algo efectivo" = "Muy efectivo o algo efectivo" ,
+                         "Poco efectivo" = "Poco efectivo o nada efectivo",
+                         "Nada efectivo" = "Poco efectivo o nada efectivo")
+  )%>%
+  mutate(
+    desemp_gub1= factor(desemp_gub1, levels =c('Muy efectivo o algo efectivo', 
+                                               "Poco efectivo o nada efectivo"))
+  )
+
+#Vuelvo a correr el diseño muestral#
+
+
+dm_CB_agr<-svydesign(ids = ~UPM_DIS, strata = ~EST_DIS, weights = ~FAC_SEL, data =ENSU_CB, nest = T)
+
+hist_desemp_gub_IZTP<-ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "IZTP")) +  
+  aes(x = trimestre, fill= desemp_gub1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Iztapalapa: Efectividad del gobierno de la demarcación para resolver problemáticas",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+hist_desemp_gub_IZTP
+
+hist_desemp_gub_cdmx<-ggsurvey(subset(dm_CB_agr,  NOM_ENT== "CIUDAD DE MEXICO")) +  
+  aes(x = trimestre, fill= desemp_gub1) +geom_bar(position = "fill",) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("Ciudad de México: Efectividad del gobierno de la demarcación para resolver problemáticas",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())+facet_wrap(~nom_cdmx1)
+
+hist_desemp_gub_cdmx
+
+hist_desemp_gub_V.CAR<-ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "V.CAR")) +  
+  aes(x = trimestre, fill= desemp_gub1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("VENUSTIANO CARRANZA: Efectividad del gobierno de la demarcación para resolver problemáticas",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+hist_desemp_gub_V.CAR
+
+hist_desemp_gub_TLHC<-ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "TLHC")) +  
+  aes(x = trimestre, fill= desemp_gub1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("TLAHUAC: Efectividad del gobierno de la demarcación para resolver problemáticas",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+hist_desemp_gub_TLHC
+
+hist_desemp_gub_M.ALTA<-ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "M.ALTA")) +  
+  aes(x = trimestre, fill= desemp_gub1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("MILPA ALTA: Efectividad del gobierno de la demarcación para resolver problemáticas",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+hist_desemp_gub_M.ALTA
+
+
+hist_desemp_gub_TLPN<-ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "TLPN")) +  
+  aes(x = trimestre, fill= desemp_gub1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("TLALPAN: Efectividad del gobierno de la demarcación para resolver problemáticas",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+hist_desemp_gub_TLPN
+
+
+
+hist_desemp_gub_XOCH<-ggsurvey(subset(dm_CB_agr,  nom_cdmx1 == "XOCH")) +  
+  aes(x = trimestre, fill= desemp_gub1) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ 
+  ggtitle("XOCHIMILCO: Efectividad del gobierno de la demarcación para resolver problemáticas",
+          subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format())
+
+hist_desemp_gub_XOCH
+
+
+#####Victimización######
+
+##Esto identifica a las PERSONAS que fueron víctimas###
+ENSU_CB <- ENSU_CB %>% mutate(
+  victi = case_when(BP1_6_1 == 9 | BP1_6_2 == 9 |
+                      BP1_6_3 == 9 | BP1_6_4 == 9 |
+                      BP1_6_5 == 9 | BP1_6_6 == 9 ~ NA,
+                    BP1_6_1 == 1 | BP1_6_2 == 1 |
+                      BP1_6_3 == 1 | BP1_6_4 == 1 |
+                      BP1_6_5 == 1 | BP1_6_6 == 1 ~ "Víctima",
+                    BP1_6_1 == 2 | BP1_6_2 == 2 |
+                      BP1_6_3 == 2 | BP1_6_4 == 2 |
+                      BP1_6_5 == 2 | BP1_6_6 == 2 ~ "No víctima")
+)
+ingresoingresby 
+
+
+dm_CB_VIV_agr<-svydesign(ids = ~UPM_DIS*ID_VIV, strata = ~EST_DIS, weights = ~FAC_VIV, data =ENSU_CB, nest = T)
+estima
+
+svyby(~factor(victi), ~factor(nom_cdmx1), design = subset(dm_CB_VIV_agr,  NOM_ENT == "CIUDAD DE MEXICO" & trimestre == "T4-23" & R_DEF == "01"), svytotal, na.rm = TRUE)
+
+
+?svytotal()
+
+?svyby()
+g_vict_hist_cdmx<- ggsurvey(subset(dm_CB_VIV_agr,  NOM_ENT == "CIUDAD DE MEXICO" & grepl("^(T2|T4)",trimestre) & R_DEF == "01")) +  
+  aes(x = trimestre, fill= victi) +geom_bar(position = "fill") + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 3.2 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Victimización 2 en el hogar en CDMX por demarcación", subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format()) + facet_wrap(~nom_cdmx1)
+
+g_vict_hist_cdmx
+
+#Iztapalapa#
+
+g_vict_hist_IZTP<- ggsurvey(subset(dm_CB_VIV_agr,  nom_cdmx1 == "IZTP" & grepl("^(T2|T4)",trimestre)& R_DEF == "01")) +  
+  aes(x = nom_cdmx1, fill= victi) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Victimización en el hogar en IZTAPALAPA por trimestre",
+                                                               subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format()) + facet_grid(~trimestre) + theme(axis.text.x = element_blank())
+
+g_vict_hist_IZTP
+
+#Tlahuac#
+g_vict_hist_TLHC<- ggsurvey(subset(dm_CB_VIV_agr,  nom_cdmx1 == "TLHC" & grepl("^(T2|T4)",trimestre)& !is.na(victi)& R_DEF == "01")) +  
+  aes(x = nom_cdmx1, fill= victi) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Victimización en el hogar en TLAHUAC por trimestre",
+                                                               subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format()) + facet_grid(~trimestre) + theme(axis.text.x = element_blank())
+
+g_vict_hist_TLHC
+
+#V. Carranza#
+g_vict_hist_V.CAR<- ggsurvey(subset(dm_CB_VIV_agr,  nom_cdmx1 == "V.CAR" & grepl("^(T2|T4)",trimestre)& !is.na(victi)& R_DEF == "01")) +  
+  aes(x = nom_cdmx1, fill= victi) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Victimización en el hogar en VENUSTIANO CARRANZA por trimestre",
+                                                               subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format()) + facet_grid(~trimestre) + theme(axis.text.x = element_blank())
+
+g_vict_hist_V.CAR
+
+#Milpa Alta#
+g_vict_hist_M.ALTA<- ggsurvey(subset(dm_CB_VIV_agr,  nom_cdmx1 == "M.ALTA" & grepl("^(T2|T4)",trimestre)& !is.na(victi)& R_DEF == "01")) +  
+  aes(x = nom_cdmx1, fill= victi) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Victimización en el hogar en MILPA ALTA por trimestre",
+                                                               subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format()) + facet_grid(~trimestre) + theme(axis.text.x = element_blank())
+
+g_vict_hist_M.ALTA
+
+#TLALPAN#
+
+g_vict_hist_TLPN<- ggsurvey(subset(dm_CB_VIV_agr,  nom_cdmx1 == "TLPN" & grepl("^(T2|T4)",trimestre)& !is.na(victi)& R_DEF == "01")) +  
+  aes(x = nom_cdmx1, fill= victi) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Victimización en el hogar en TLALPAN por trimestre",
+                                                               subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format()) + facet_grid(~trimestre) + theme(axis.text.x = element_blank())
+
+g_vict_hist_TLPN
+
+#XOCHIMILCO#
+
+g_vict_hist_XOCH<- ggsurvey(subset(dm_CB_VIV_agr,  nom_cdmx1 == "XOCH" & grepl("^(T2|T4)",trimestre)& !is.na(victi)& R_DEF == "01")) +  
+  aes(x = nom_cdmx1, fill= victi) +geom_bar(position = "fill", width = 0.5) + 
+  labs( y = "", x = "", fill = "")+
+  geom_text(aes(label = unlist(tapply(..count.., list(..x.., ..PANEL..),function(a) paste(round(100*a/sum(a), 1), '%'))),
+                y = ..count.. ), stat = "count", position = position_fill(vjust = .5), size = 4.5 )+ 
+  theme_minimal() + theme(legend.position = "bottom")+ ggtitle("Victimización en el hogar en XOCHIMILCO por trimestre",
+                                                               subtitle = "INEGI, Encuesta Nacional de Seguridad Urbana ENSU, Junio 2024")+
+  scale_y_continuous(labels = scales::percent_format()) + facet_grid(~trimestre) + theme(axis.text.x = element_blank())
+
+g_vict_hist_XOCH
+
+
+
+###Casos###
+
+table(ENSU_CB$BP1_1, ENSU_CB$nom_cdmx1)
+
+table(ENSU_CB$BP1_1)
+
+

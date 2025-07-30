@@ -1,0 +1,665 @@
+################################################################################
+#Creación gráficos: Encuesta de encuestas
+#Este proyecto trabaja con datos de las principales encuestas oficiales de intención de voto
+#para las elecciones generales de Bolivia 2025
+# Autor: Esteban Calisaya
+# Fecha: 2025-06-26
+# Modificado: 2025-06-26
+#GeoData-Huasi 
+################################################################################
+
+
+if (!require("pacman")) install.packages("pacman") ## instala pacman si se requiere
+
+pacman::p_load(tidyverse,
+               writexl, 
+               haven,
+               sjlabelled, 
+               janitor,
+               magrittr,
+               viridis,
+               ggthemes,
+               ggpubr,
+               GGally,
+               DescTools, ## Paquete con pruebas estadísticas
+               infer, ## inferencia compatible con formato tidy
+               broom, ## paquete para volver _tidy_ resultados
+               srvyr,
+               readr,
+               skimr,
+               DataExplorer,
+               gtsummary,
+               flextable,
+               huxtable,
+               googlesheets4,
+               stringr,
+               scales,
+               lubridate,
+               forcats,
+               plotly,
+               gt,
+               tidyr
+)
+
+#Última encuesta
+
+ultima_consultora <- df_campaña %>%
+  filter(cons_emp != length(nuevas_etiquetas)) %>%
+  filter(fecha_fin == max(fecha_fin)) %>%
+  pull(cons_emp) %>%
+  first() %>%  # Tomamos el primer valor (por si hay empates)
+  as_label() 
+
+g_ultima_encuesta<-df_campaña %>%
+  filter(cons_emp != length(nuevas_etiquetas))|>
+  filter(fecha_fin == max(fecha_fin))|>
+    ungroup()|>
+  ggplot(aes(
+    x = candidat,
+    y = intencion,
+    fill = as_label(candidat),
+    group = as_label(cons_emp)
+  )) +
+  geom_col(position = position_dodge(width = 1), alpha = 1, width = .8) +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci),
+                position = position_dodge(width = 1),
+                width = .8, alpha = 0.6) +
+  # Etiquetas SOLO para última encuesta (ajusta vjust para posición vertical)
+  geom_text(
+    aes(label = scales::percent(intencion, accuracy = 0.1)),
+    position = position_dodge(width = 1),
+    vjust = -0.5,  # Ajusta esta posición vertical
+    size = 3,
+    color = "black",
+    fontface = "bold"
+  )  +
+  scale_fill_manual(values = colores_13)+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +  # si tenés paleta definida
+  labs(
+    title = paste0("Intención de voto total por candidato según ", ultima_consultora),
+    subtitle = paste0("Último levantamiento: ", max(df_campaña[df_campaña$cons_emp!= length(nuevas_etiquetas),]$fecha_fin)),    x = "Candidatura",
+    y = "Intención de voto (%)",
+    fill = "Consultora o empresa",
+    caption = "Fuente: Elaboración propia con base en encuestas autorizadas por el TSE,
+    intervalos de confianza calculados con el margen de error que publica la encuestadora"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))+
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(hjust = 1)
+  )
+
+g_ultima_encuesta
+
+
+####Votos total----
+
+g_camp<-df_campaña %>%
+  ggplot(aes(
+    x = candidat,
+    y = intencion,
+    fill = as_label(cons_emp),
+    group = as_label(cons_emp)
+  )) +
+  geom_col(position = position_dodge(width = .8), alpha = 1, width = .8) +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci),
+                position = position_dodge(width = .8),
+                width = .8, alpha = 0.6) +
+  # Etiquetas SOLO para Promedio (ajusta vjust para posición vertical)
+  geom_text(
+    data = . %>% filter(as_label(cons_emp) == "Promedio"),
+    aes(label = scales::percent(intencion, accuracy = 0.1)),
+    position = position_nudge(x = 0.4),
+    vjust = -1,  # Ajusta este valor para subir/bajar las etiquetas
+    size = 3,
+    color = "black",
+    fontface = "bold"
+  ) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +  # si tenés paleta definida
+  labs(
+    title = "Mayo - Julio 2025: intención de voto total por candidato y consultora o empresa encuestadora",
+    subtitle = "Se toma en cuenta la intención de voto con fecha más reciente por empresa consultora",
+    x = "Candidatura",
+    y = "Intención de voto (%)",
+    fill = "Consultora o empresa",
+    caption = "Fuente: Elaboración propia con base en encuestas autorizadas por el TSE,
+    intervalos de confianza calculados con el margen de error que publica la encuestadora"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))+
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(hjust = 1)
+  )
+
+g_camp
+
+
+
+#La mejorsísima hasta el momento
+g1<-ggplot(df_long, aes(
+  x = fecha_fin,
+  y = intencion,
+  color = candidat,
+  shape = as_label(cons_emp)
+))+
+  # Primero: Líneas SOLO para los promedios (conexión entre meses)
+  geom_line(
+    data = df_long %>% filter(cons_emp == length(nuevas_etiquetas)),  # Solo promedios
+    aes(group = candidat),
+    linetype = "solid",
+    linewidth = 0.8,
+    alpha = 1,
+    position = if (any(count(df_long, mes_ano, candidat)$n > 1)) {
+      position_dodge(width = 0.5)  # Dodge si hay grupos con >1 observación
+    } else {
+      position_identity()          # Posición exacta si todos tienen 1 observación
+    }
+  ) +
+  geom_errorbar(
+    aes(ymin = lower_ci, ymax = upper_ci),
+    position = if (any(count(df_long, mes_ano, candidat)$n > 1)) {
+      position_dodge(width = 0.5)  # Dodge si hay grupos con >1 observación
+    } else {
+      position_identity()          # Posición exacta si todos tienen 1 observación
+    },
+    width = 0.25,
+    alpha = 0.5
+  ) +
+  geom_point(
+    data = df_long %>% filter(as_label(cons_emp) == "Promedio"),
+    position = if (any(count(df_long, mes_ano, candidat)$n > 1)) {
+      position_dodge(width = 0.5)  # Dodge si hay grupos con >1 observación
+    } else {
+      position_identity()          # Posición exacta si todos tienen 1 observación
+    },
+    size = 5,
+    alpha = 1
+    )+
+  geom_point(
+    data = df_long %>% filter(as_label(cons_emp) != "Promedio"),
+    position = if (any(count(df_long, mes_ano, candidat)$n > 1)) {
+      position_dodge(width = 0.5)  # Dodge si hay grupos con >1 observación
+    } else {
+      position_identity()          # Posición exacta si todos tienen 1 observación
+    },
+    size = 5,
+    alpha = 0.4
+  )+
+  scale_x_date(
+    labels = date_format("%B %Y"),
+    breaks = pretty_breaks(n = 5)  # Aproximadamente 5 breaks
+  ) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    breaks = seq(0, 1, by = 0.05),  # Marcas cada 5%
+    limits = c(0, NA)
+  ) +
+  scale_color_manual(values = colores_13) +
+  labs(
+    title = "Marzo - julio 2025: intención de voto total agrupada por mes",
+    subtitle = "Se toma en cuenta Blancos, Nulos e Indecisos para el total. Se pone el promedio mensual al final de cada mes",
+    x = "Mes de levantamiento",
+    y = "Intención de voto (%)",
+    color = "Candidatura",
+    shape = "Consultora o empresa",
+    caption = "Fuente: Elaboración propia con base en encuestas autorizadas por el TSE y 'súper encuesta'
+    de Marcelo Claure, intervalos de confianza escalados con base en el margen de error que publica la encuestadora"
+  )  +
+  theme(
+    plot.caption = element_text(
+      hjust = 0,      # Alineación izquierda
+      size = 9,       # Tamaño de fuente
+      face = "italic", # Estilo de letra
+      color = "gray40", # Color del texto
+      margin = margin(t = 10)  # Margen superior
+    )
+  )+
+  guides(
+    color = guide_legend(
+      override.aes = list(shape = 15, size = 5),
+      ncol = 3, # Ajusta este valor (ej. 2, 3, 4) hasta que todos los candidatos entren bien
+      byrow = TRUE, # Rellena por fila primero
+      title.position = "top", # Título "Candidatura" encima de las entradas
+      order = 1 # Define el orden si quieres que "Candidatura" aparezca primero
+    ),
+    shape = guide_legend(
+      override.aes = list(size = 4),
+      ncol = 1, # Ajusta según el número de consultoras
+      byrow = TRUE,
+      title.position = "top", # Título "Consultora o empresa" encima de las entradas
+      order = 2 # Define el orden si quieres que "Consultora o empresa" aparezca segunda
+    )
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 45, hjust = .5)
+  )+geom_vline(
+    xintercept = as.Date(c("2025-05-19", "2025-07-06", "2025-07-09", "2025-07-17", "2025-07-20")),  # Reemplaza con tus fechas
+    color = "gray50",
+    linetype = "dashed",
+    linewidth = 0.5,
+    alpha = 0.7
+  ) +
+  # Etiquetas posicionadas al 80% del máximo local
+  geom_text(
+    data = ~ {
+      # Calcular el máximo de intención cerca de cada fecha hito
+      hitos <- data.frame(
+        fecha = as.Date(c("2025-05-19", "2025-07-06", "2025-07-09", "2025-07-17", "2025-07-20")),
+        label = c("Inicio campaña", "Primer debate", "Inhabilitación J. Dunn", "Claure apoya a Samuel", "Segundo debate")
+      )
+      
+      # Para cada fecha hito, encontrar el máximo de intención en un rango de ±15 días
+      hitos$y <- sapply(hitos$fecha, function(f) {
+        df_efectivo_mes %>% 
+          filter(fecha_fin >= f - 15, fecha_fin <= f + 15) %>% 
+          pull(intencion) %>% 
+          max(na.rm = TRUE) * 0.6  # Posicionar al 80% del máximo
+      })
+      hitos
+    },
+    aes(x = fecha, y = y, label = label),
+    inherit.aes = FALSE,
+    angle = 90,
+    hjust = -0.1,
+    vjust = 0.5,
+    color = "gray30",
+    size = 3
+  )
+
+
+  
+g1
+
+
+####Votos efectivos----
+g_camp_efc<-df_efectivo_campaña %>%
+  ggplot(aes(
+    x = candidat,
+    y =  intencion,
+    fill = as_label(cons_emp),
+    group = as_label(cons_emp)
+  )) +
+  geom_col(position = position_dodge(width = .8), alpha = 1, width = .8) +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci),
+                position = position_dodge(width = .8),
+                width = .8, alpha = 0.6) +
+  # Etiquetas SOLO para Promedio (ajusta vjust para posición vertical)
+  geom_text(
+    data = . %>% filter(as_label(cons_emp) == "Promedio"),
+    aes(label = scales::percent(intencion, accuracy = 0.1)),
+    position = position_nudge(x = 0.4),
+    vjust = -1,  # Ajusta este valor para subir/bajar las etiquetas
+    size = 3,
+    color = "black",
+    fontface = "bold"
+  ) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +  # si tenés paleta definida
+  labs(
+    title = "Mayo - julio 2025: intención de voto válido por candidato y consultora o empresa encuestadora",
+    subtitle = "Se toma en cuenta la intención de voto más reciente por empresa consultora",
+    x = "Candidatura",
+    y = "Intención de voto (%)",
+    fill = "Consultora o empresa",
+    caption = "Fuente: Elaboración propia con base en encuestas autorizadas por el TSE,
+    intervalos de confianza escalados con base en el margen de error que publica la encuestadora"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))+
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(hjust = 1)
+  )
+
+g_camp_efc
+
+
+#Gráfico votos efectivos
+g_efectivo <- ggplot(df_efectivo_mes, aes(
+  x = fecha_fin,
+  y = intencion,
+  color = candidat,
+  shape = as_label(cons_emp)
+)) +
+  geom_line(
+    data = df_efectivo_mes %>% filter(as_label(cons_emp) == "Promedio"),  # Solo promedios
+    aes(group = candidat),
+    linetype = "solid",
+    linewidth = 0.8,
+    alpha = 1,
+    position = if (any(count(df_efectivo_mes, mes_ano, candidat)$n > 1)) {
+      position_dodge(width = 0.5)  # Dodge si hay grupos con >1 observación
+    } else {
+      position_identity()          # Posición exacta si todos tienen 1 observación
+    }
+  ) +
+  geom_errorbar(
+    aes(ymin = lower_ci, ymax = upper_ci),
+    position = if (any(count(df_efectivo_mes, mes_ano, candidat)$n > 1)) {
+      position_dodge(width = 0.5)  # Dodge si hay grupos con >1 observación
+    } else {
+      position_identity()          # Posición exacta si todos tienen 1 observación
+    },
+    width = 0.25,
+    alpha = 0.5
+  ) +
+  geom_point(
+    data = df_efectivo_mes %>% filter(as_label(cons_emp) == "Promedio"),
+    position = if (any(count(df_efectivo_mes, mes_ano, candidat)$n > 1)) {
+      position_dodge(width = 0.5)  # Dodge si hay grupos con >1 observación
+    } else {
+      position_identity()          # Posición exacta si todos tienen 1 observación
+    },
+    size = 5,
+    alpha = 1
+  ) +
+  geom_point(
+    data = df_efectivo_mes %>% filter(as_label(cons_emp) != "Promedio"),
+    position = if (any(count(df_efectivo_mes, mes_ano, candidat)$n > 1)) {
+      position_dodge(width = 0.5)  # Dodge si hay grupos con >1 observación
+    } else {
+      position_identity()          # Posición exacta si todos tienen 1 observación
+    },
+    size = 5,
+    alpha = 0.4
+  ) +
+  scale_x_date(
+    date_labels = "%B %Y",
+    date_breaks = "1 month"
+  ) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    breaks = seq(0, 1, by = 0.05),  # Marcas cada 5%
+    limits = c(0, NA)
+  ) +
+  scale_color_manual(values = colores_10) +
+  labs(
+    title = "Marzo - julio 2025: Intención de voto efectivo (100% = votos válidos)",
+    subtitle = "Excluyendo Blancos, Nulos e Indecisos. Se pone el promedio mensual al final de cada mes",
+    x = "Mes de levantamiento",
+    y = "Porcentaje de votos válidos (%)",
+    color = "Candidatura",
+    shape = "Consultora o empresa",
+    caption = "Fuente: Elaboración propia con base en encuestas autorizadas por el TSE y 'súper encuesta'
+    de Marcelo Claure, intervalos de confianza escalados con base en el margen de error que publica la encuestadora"
+  )  +
+  theme(
+    plot.caption = element_text(
+      hjust = 0,      # Alineación izquierda
+      size = 9,       # Tamaño de fuente
+      face = "italic", # Estilo de letra
+      color = "gray40", # Color del texto
+      margin = margin(t = 10)  # Margen superior
+    )
+  )+
+  guides(
+    color = guide_legend(
+      override.aes = list(shape = 15, size = 5),
+      ncol = 3, # Ajusta este valor (ej. 2, 3, 4) hasta que todos los candidatos entren bien
+      byrow = TRUE, # Rellena por fila primero
+      title.position = "top", # Título "Candidatura" encima de las entradas
+      order = 1 # Define el orden si quieres que "Candidatura" aparezca primero
+    ),
+    shape = guide_legend(
+      override.aes = list(size = 4),
+      ncol = 1, # Ajusta según el número de consultoras
+      byrow = TRUE,
+      title.position = "top", # Título "Consultora o empresa" encima de las entradas
+      order = 2 # Define el orden si quieres que "Consultora o empresa" aparezca segunda
+    )
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 45, hjust = .5)
+  )+geom_vline(
+    xintercept = as.Date(c("2025-05-19", "2025-07-06", "2025-07-09", "2025-07-17", "2025-07-20")),  # Reemplaza con tus fechas
+    color = "gray50",
+    linetype = "dashed",
+    linewidth = 0.5,
+    alpha = 0.7
+  ) +
+    # Etiquetas posicionadas al 80% del máximo local
+  geom_text(
+    data = ~ {
+      # Calcular el máximo de intención cerca de cada fecha hito
+      hitos <- data.frame(
+        fecha = as.Date(c("2025-05-19", "2025-07-06", "2025-07-09", "2025-07-17", "2025-07-20")),
+        label = c("Inicio campaña", "Primer debate", "Inhabilitación J. Dunn", "Claure apoya a Samuel", "Segundo debate")
+      )
+      
+      # Para cada fecha hito, encontrar el máximo de intención en un rango de ±15 días
+      hitos$y <- sapply(hitos$fecha, function(f) {
+        df_efectivo_mes %>% 
+          filter(fecha_fin >= f - 15, fecha_fin <= f + 15) %>% 
+          pull(intencion) %>% 
+          max(na.rm = TRUE) * 0.6  # Posicionar al 80% del máximo
+      })
+      hitos
+    },
+    aes(x = fecha, y = y, label = label),
+    inherit.aes = FALSE,
+    angle = 90,
+    hjust = -0.1,
+    vjust = 0.5,
+    color = "gray30",
+    size = 3
+  )
+
+g_efectivo
+
+
+#Gráficas históricas
+
+g_19<-df19_long %>%
+  ggplot(aes(
+    x = candidat,
+    y = intencion,
+    fill = as_label(cons_emp),
+    group = as_label(cons_emp)
+  )) +
+  geom_col(position = position_dodge(width = .8), alpha = 1, width = .7) +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci),
+                position = position_dodge(width = 0.8),
+                width = .7, alpha = 0.6) +
+  # Etiquetas SOLO para Promedio (ajusta vjust para posición vertical)
+  geom_text(
+    data = . %>% filter(as_label(cons_emp) == "RESULTADOS OFICIALES"),
+    aes(label = scales::percent(intencion, accuracy = 0.1)),
+    position = position_nudge(x = 0.4),
+    vjust = -1,  # Ajusta este valor para subir/bajar las etiquetas
+    size = 3,
+    color = "black",
+    fontface = "bold"
+  ) +
+  geom_text(
+    data = . %>% filter(as_label(cons_emp) != "RESULTADOS OFICIALES" & as_label(candidat) == "indeciso/secreto"),
+    aes(label = scales::percent(intencion, accuracy = 0.1)),
+    position = position_dodge(width= .7),
+    vjust = -1,  # Ajusta este valor para subir/bajar las etiquetas
+    size = 3,
+    color = "black",
+    fontface = "bold"
+  ) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +  # si tenés paleta definida
+  labs(
+    title = "Octubre 2019: intención de voto y votación total por candidato y consultora o empresa encuestadora",
+    subtitle = "Los resultados oficiales mostrados toman en cuenta blancos y nulos para el cálculo de porcentajes",
+    x = "Candidatura",
+    y = "Intención de voto (%)",
+    fill = "Consultora o empresa",
+    caption = "Fuente: Elaboración propia con base en encuestas levantadas durante octubre de 2019 y cómputo oficial del TSE,
+    intervalos de confianza estimados con base en el margen de error que publica la encuestadora"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))+
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(hjust = 1)
+  )
+
+g_19
+
+g_20<-df20_long %>%
+  ggplot(aes(
+    x = candidat,
+    y = intencion,
+    fill = as_label(cons_emp),
+    group = as_label(cons_emp)
+  )) +
+  geom_col(position = position_dodge(width = .8), alpha = 1, width = .7) +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci),
+                position = position_dodge(width = 0.8),
+                width = .7, alpha = 0.6) +
+  # Etiquetas SOLO para Promedio (ajusta vjust para posición vertical)
+  geom_text(
+    data = . %>% filter(as_label(cons_emp) == "RESULTADOS OFICIALES"),
+    aes(label = scales::percent(intencion, accuracy = 0.1)),
+    position = position_nudge(x = 0.4),
+    vjust = -1,  # Ajusta este valor para subir/bajar las etiquetas
+    size = 3,
+    color = "black",
+    fontface = "bold"
+  ) +
+  geom_text(
+    data = . %>% filter(as_label(cons_emp) != "RESULTADOS OFICIALES" & as_label(candidat) == "indeciso/secreto"),
+    aes(label = scales::percent(intencion, accuracy = 0.1)),
+    position = position_dodge(width= .7),
+    vjust = -1,  # Ajusta este valor para subir/bajar las etiquetas
+    size = 3,
+    color = "black",
+    fontface = "bold"
+  ) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +  # si tenés paleta definida
+  labs(
+    title = "Octubre 2020: intención de voto y votación total por candidato y consultora o empresa encuestadora",
+    subtitle = "Los resultados oficiales mostrados toman en cuenta blancos y nulos para el cálculo de porcentajes",
+    x = "Candidatura",
+    y = "Intención de voto (%)",
+    fill = "Consultora o empresa",
+    caption = "Fuente: Elaboración propia con base en encuestas levantadas durante octubre de 2020 y cómputo oficial del TSE,
+    intervalos de confianza estimados con base en el margen de error que publica la encuestadora"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))+
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(hjust = 1)
+  )
+
+g_20
+
+
+#Tablas resumen
+
+
+## 1. Obtener los promedios de campaña desde df_campaña
+promedios_campaña <- df_campaña %>%
+  filter(grepl("Promedio", as_label(cons_emp), ignore.case = TRUE)) %>%
+  mutate(intencion_formateada = sprintf("%.1f%%", intencion*100)) %>%
+  select(candidat, "Promedio campaña" = intencion_formateada)
+
+## 2. Preparar datos de fechas
+fechas_levantamiento <- df_long %>%
+  filter(!grepl("Promedio", as_label(cons_emp), ignore.case = TRUE)) %>%
+  distinct(id, cons_emp, fecha_fin) %>%
+  mutate(
+    Consultora = paste(id, ". ", as_label(cons_emp)),
+    Fecha = format(fecha_fin, "%d/%m/%Y")
+  ) %>%
+  select(Consultora, Fecha) %>%
+  pivot_wider(
+    names_from = Consultora,
+    values_from = Fecha
+  ) %>%
+  mutate(candidat = "Fecha levantamiento",
+         "Promedio campaña" = "--") %>%
+  select(candidat, everything(), "Promedio campaña")
+
+## 3. Preparar y ordenar datos de intención
+datos_intencion <- df_long %>%
+  filter(!grepl("Promedio", as_label(cons_emp), ignore.case = TRUE) )%>%
+           mutate(
+             Consultora = paste(id, ". ", as_label(cons_emp)),
+             candidato = factor(candidat, levels = unique(dictionary$descr_etiquetas)),
+             intencion_formateada = ifelse(is.na(intencion), "--", sprintf("%.1f%%", intencion*100))
+           ) %>%
+           select(Consultora, candidat, intencion_formateada) %>%
+           pivot_wider(
+             names_from = Consultora,
+             values_from = intencion_formateada
+           ) %>%
+           left_join(promedios_campaña, by = "candidat") %>%
+            # ORDENAMIENTO CORREGIDO (usa backticks para nombres con espacios)
+            arrange(desc(readr::parse_number(gsub("%", "", `Promedio campaña`))))
+
+
+## 3. Preparar y ordenar datos de intención (VERSIÓN FINAL)
+datos_intencion <- df_long %>%
+  filter(!grepl("Promedio", as_label(cons_emp), ignore.case = TRUE)) %>%
+           mutate(
+             Consultora = paste(id,". ", as_label(cons_emp)),
+             candidato = factor(candidat, levels = unique(dictionary$descr_etiquetas)),
+             intencion_formateada = ifelse(is.na(intencion), "--", sprintf("%.1f%%", intencion*100)),
+             # Crear categoría para ordenamiento especial
+             orden_custom = case_when(
+               candidat %in% c("Blancos", "Nulos", "Indecisos") ~ 2,
+               TRUE ~ 1
+             )
+           ) %>%
+           select(Consultora, candidat, intencion_formateada, orden_custom) %>%
+           pivot_wider(
+             names_from = Consultora,
+             values_from = intencion_formateada
+           ) %>%
+           left_join(promedios_campaña, by = "candidat") %>%
+           # Ordenar primero por categoría custom, luego por promedio
+           arrange(orden_custom, desc(readr::parse_number(gsub("%", "", `Promedio campaña`)))) %>%
+           select(-orden_custom)  # Eliminar la columna temporal
+
+## 4. Combinar tablas
+tabla_completa <- bind_rows(
+  fechas_levantamiento,
+  datos_intencion
+) %>%
+  # Crear tabla GT
+  gt() %>%
+  tab_header(
+    title = "Marzo - julio 2025: cuadro resumen encuestas de intención de voto",
+    subtitle = "Los promedios se calculan desde el inicio de campaña (19-05-2025) en adelante y con el dato de la encuesta más reciente de cada consultora"
+  ) %>%
+  tab_options(
+    table.font.size = "70%",
+    column_labels.font.weight = "bold",
+    data_row.padding = px(8)
+  ) %>%
+  cols_label(
+    candidat = ""
+  ) %>%
+  cols_align(
+    align = "center",
+    columns = everything()
+  ) %>%
+  tab_style(
+    style = list(
+      cell_text(weight = "bold"),
+      cell_fill(color = "#f5f5f5")
+    ),
+    locations = cells_body(
+      rows = candidat == "Fecha levantamiento",
+      columns = everything()
+    )
+  ) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = "#f0f0f0")
+    ),
+    locations = cells_body(
+      columns = "Promedio campaña"
+    )
+  )
+
+tabla_completa

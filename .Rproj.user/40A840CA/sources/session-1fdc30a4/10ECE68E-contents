@@ -1,0 +1,42 @@
+project:
+  type: website
+
+website:
+  title: "Percepción de Seguridad en la Ciudad de México"
+  navbar:
+    logo: "logo_cdmx.png"
+    left:
+      - text: "Presentación"
+        href: index.qmd
+      - text: "Percepción seguridad"
+        href: "#percepcion-de-seguridad"
+      - text: "Incivilidades" 
+        href: "#incivilidades"
+      - text: "Acoso y violencia sexual"
+        href: "#acoso-y-violencia-sexual"
+      - text: "Victimización"
+        href: "#victimizacion"
+      - text: "Confianza Gobierno"
+        href: "#confianza-en-autoridades-gubernamentales"
+      - text: "Confianza fuerzas seguridad"
+        href: "#confianza-en-fuerzas-de-seguridad"
+        
+        
+
+    right:
+      - icon: github
+        href: https://github.com/hescalar/ensu_GOB-CDMX
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-location: left
+    fig-align: center
+    fig-width: 9
+    fig-height: 5
+    fig-responsive: true
+    css: styles.css
+    lang: es
+    page-layout: full
+    container-width: 1100px

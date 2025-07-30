@@ -1,0 +1,491 @@
+################################################################################
+#Encuesta de encuestas:
+#Este proyecto trabaja con datos de las principales encuestas oficiales de intención de voto
+#para las elecciones generales de Bolivia 2025
+# Autor: Esteban Calisaya
+# Fecha: 2025-06-26
+# Modificado: 2025-06-26
+#GeoData-Huasi 
+################################################################################
+
+
+if (!require("pacman")) install.packages("pacman") ## instala pacman si se requiere
+
+pacman::p_load(tidyverse,
+               writexl, 
+               haven,
+               sjlabelled, 
+               janitor,
+               magrittr,
+               viridis,
+               ggthemes,
+               ggpubr,
+               GGally,
+               DescTools, ## Paquete con pruebas estadísticas
+               infer, ## inferencia compatible con formato tidy
+               broom, ## paquete para volver _tidy_ resultados
+               srvyr,
+               readr,
+               skimr,
+               DataExplorer,
+               gtsummary,
+               flextable,
+               huxtable,
+               googlesheets4,
+               stringr,
+               scales,
+               lubridate,
+               forcats,
+               plotly
+)
+
+
+####Datos----
+
+gs4_deauth()
+
+df<-googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1Nr5mlVI1PAIXpaOtmRugJbwyriQYlAUt5Ldehq8VZ6E/edit?gid=0#gid=0")
+dictionary <-googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1VJZkKd5dDWnHzbOO3G4o7yeW8jh1GZJIhykaApI05MQ/edit?gid=1761737635#gid=1761737635")
+
+
+etiquetar_df_base <- function(df, dictionary) {
+  
+  # Función para parsear etiquetas de valores tipo: 1 = "Texto"
+  parse_labels <- function(value_string) {
+    matches <- str_match_all(value_string, "(\\d+)\\s*=\\s*\\\"(.*?)\\\"")[[1]]
+    if (nrow(matches) == 0) return(NULL)
+    labels <- as.numeric(matches[, 2])
+    names(labels) <- matches[, 3]
+    return(labels)
+  }
+  
+  for (var in names(df)) {
+    if (var %in% dictionary$Variable) {
+      row <- dictionary %>% filter(Variable == var)
+      
+      # Asigna la descripción como etiqueta de variable
+      attr(df[[var]], "label") <- row$Descripción
+      
+      # Asigna las etiquetas de valores, si existen
+      value_labels_str <- row$values
+      if (!is.na(value_labels_str) && str_detect(value_labels_str, "=")) {
+        value_labels <- parse_labels(value_labels_str)
+        if (!is.null(value_labels)) {
+          attr(df[[var]], "labels") <- value_labels
+        }
+      }
+    }
+  }
+  
+  return(df)
+}
+
+df<- etiquetar_df_base(df, dictionary)
+
+df <- df |>
+  mutate(across(matches("^fecha"), ~ as.Date(as.character(.), format = "%d/%m/%Y")))
+
+head(df)
+
+
+
+candidat <- dictionary %>%
+  filter(Variable %in% names(df)) %>%
+  filter(Variable %in% c("ap", "ngp", "fp", "lyp_adn", "apb_sumate", "libre", "morena", "pdc", "mas_ipsp", "unidad", "blancos", "nulos", "indec")) %>%
+  select(partido = Variable, candidat = descr_etiquetas)
+
+
+
+# 2. Pivotar df e incorporar nombres de candidata/o
+df_long <- df %>%
+  pivot_longer(
+    cols = ap:indec,
+    names_to = "partido",
+    values_to = "intencion"
+  ) %>%
+  left_join(candidat, by = "partido") %>%
+  mutate(
+    mes_ano = lubridate::floor_date(fecha_fin, unit = "month")
+  )
+
+head(df_long)
+
+#Crear nivel y variable de promedio
+#El diccionario me dice que son 20 niveles (y 20 valores)
+
+
+etiquetas_actuales <- attr(df_long$cons_emp, "labels")
+
+# Asegurarse de que los valores son numéricos
+etiquetas_actuales <- setNames(as.numeric(etiquetas_actuales), names(etiquetas_actuales))
+
+etiquetas_actuales
+# Agregar el nuevo nivel "Promedio" con valor (número de etiquetas + 1)
+
+
+nuevas_etiquetas <- c(etiquetas_actuales, "Promedio" = (length(etiquetas_actuales)+1))
+
+# Reasignar etiquetas a la variable 'cons_emp'
+df_long$cons_emp <- set_labels(df_long$cons_emp, labels = nuevas_etiquetas)
+
+get_labels(df_long$cons_emp)
+
+table(df_long$mes_ano)
+
+#Calcular promedios 
+
+promedios_mes <- df_long %>%
+  group_by(mes_ano, candidat) %>%
+  summarise(
+    intencion = mean(intencion, na.rm = TRUE),
+    margen_error = mean(margen_error, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    cons_emp = length(nuevas_etiquetas),
+    fecha_fin = ceiling_date(mes_ano, "month") - 1,  # Último día del mes
+    mes_ano = fecha_fin  # Actualizar mes_ano (opcional)
+  )
+
+
+# Unir los promedios al df_long original
+df_long <- bind_rows(df_long, promedios_mes)
+df_long
+
+table(df_long$cons_emp)
+df_long$cons_emp
+#Ya aparece el promedio
+
+
+df_long$cons_emp <- set_labels(
+  as.numeric(df_long$cons_emp),  # Asegura que sea numérico
+  labels = nuevas_etiquetas
+)
+
+
+#Roerdenar blancos y nulos y calcular ic
+df_long <- df_long |>
+  mutate(
+    candidat = fct_relevel(
+      candidat,
+      c(
+        "Samuel Doria Medina", "Tuto Quiroga", "Andrónico Rodríguez", 
+        "Manfred Reyes Villa", "Rodrigo Paz", "Jhonny Fernández", 
+        "Eduardo Del Castillo", "Fidel Tapia Zambrana", "Eva Copa", 
+        "Pavel Aracena",  # Candidatos ordenados manualmente
+        "Blancos", "Nulos", "Indecisos"  # Estos siempre al final
+      )
+    )
+  )|>
+  mutate(
+    lower_ci = intencion - margen_error,
+    upper_ci = intencion + margen_error,
+    lower_ci = pmax(lower_ci, 0),
+    upper_ci = pmin(upper_ci, 1)
+  )
+
+
+
+#Promedios campaña
+df_campaña <- df_long |>
+  filter(lubridate::month(fecha_fin) >= 5 & cons_emp != length(nuevas_etiquetas))|>
+  # Para cada consultora, conservar solo la encuesta más reciente
+  group_by(cons_emp) %>%
+  filter(fecha_fin == max(fecha_fin)) %>%
+  ungroup()
+
+
+promedio_campaña <- df_campaña %>%
+  group_by(candidat) %>%
+  summarise(
+    intencion = mean(intencion, na.rm = TRUE),
+    margen_error = mean(margen_error, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    cons_emp = length(nuevas_etiquetas),
+    fecha_fin = ceiling_date(max(as.Date(df_long$fecha_fin)), "month") - 1 # Último día del mes
+  )
+promedio_campaña
+
+# Unir los promedios al df_long original
+df_campaña <- bind_rows(df_campaña, promedio_campaña)
+df_campaña
+
+table(df_campaña$cons_emp)
+df_campaña$cons_emp
+#Ya aparece el promedio
+
+
+df_campaña$cons_emp <- set_labels(
+  as.numeric(df_campaña$cons_emp),  # Asegura que sea numérico
+  labels = nuevas_etiquetas
+)
+
+
+#Roerdenar blancos y nulos y calcular ic
+df_campaña <- df_campaña %>%
+  mutate(
+    candidat = fct_relevel(
+      candidat,
+      c(
+        "Samuel Doria Medina", "Tuto Quiroga", "Andrónico Rodríguez", 
+        "Manfred Reyes Villa", "Rodrigo Paz", "Jhonny Fernández", 
+        "Eduardo Del Castillo", "Fidel Tapia Zambrana", "Eva Copa", 
+        "Pavel Aracena",  # Candidatos ordenados manualmente
+        "Blancos", "Nulos", "Indecisos"  # Estos siempre al final
+      )
+    )
+  )|>
+  mutate(
+    lower_ci = intencion - margen_error,
+    upper_ci = intencion + margen_error,
+    lower_ci = pmax(lower_ci, 0),
+    upper_ci = pmin(upper_ci, 1)
+  )
+
+
+colores_13 <- c(
+  "#ffc603",  # KENCHA
+  "#ff6364",  # TUTO
+  "#3dac34",  # ADR
+  "#541a67",  # MRV
+  "brown",  # RPAZ
+  "#01a8ec",  # JF
+  "#002696",  # EDU
+  "#aa1622",  # ADN
+  "#a6761d",  #EVA
+  "#65dfe8",  # NGP
+  "gray",  # BLANCO
+  "black",  # NULO
+  "red"   # INDE
+)
+##############Votos válidos#####################
+
+votos_validos <- c("ap", "ngp", "fp", "lyp_adn", "apb_sumate", 
+                   "libre", "morena", "pdc", "mas_ipsp", "unidad")
+
+
+
+# 2. Calcular votos efectivos
+df_efectivo <- df %>%
+  # Seleccionar solo las columnas de partidos políticos (excluyendo blancos/nulos/indecisos)
+  select(id:nro_casos, all_of(votos_validos), margen_error) %>%
+  # Pivotear igual que antes
+  pivot_longer(
+    cols = all_of(votos_validos),
+    names_to = "partido",
+    values_to = "intencion_cruda"
+  ) %>%
+  # Calcular el total válido por encuesta
+  group_by(id) %>%
+  mutate(
+    total_valido = sum(intencion_cruda, na.rm = TRUE),
+    intencion = intencion_cruda / total_valido,  # Reescalar a 100% válido
+    margen_error_efectivo = margen_error / total_valido  # Ajustar margen de error
+  ) %>%
+  ungroup() %>%
+  # Mantener el join con los nombres de candidatos y fechas como en tu versión
+  left_join(candidat, by = "partido") %>%
+  mutate(
+    mes_ano = floor_date(fecha_fin, unit = "month")
+  )
+
+# 3. Verificación (debería sumar 1 en cada encuesta)
+df_efectivo %>%
+  group_by(id) %>%
+  summarise(total = sum(intencion, na.rm = TRUE), .groups = "drop") %>%
+  print(n = Inf)
+
+#4. Cambiar orden candidatos para que coincidan colores
+orden_original <- levels(df_long$candidat) %>% 
+  setdiff(c("Blancos", "Nulos", "Indecisos"))
+orden_original
+
+# 2. Aplicar este orden al dataframe de votos efectivos
+df_efectivo <- df_efectivo %>%
+  mutate(
+    candidat = factor(candidat, levels = orden_original)
+  )
+
+levels(df_efectivo$candidat)
+
+#Promedio efectivos
+
+# 4. Mantener EXACTAMENTE tu código de promedios (solo cambiando el input)
+etiquetas_actuales_ef <- attr(df_efectivo$cons_emp, "labels")
+etiquetas_actuales_ef
+etiquetas_actuales_ef
+etiquetas_actuales_ef <- setNames(as.numeric(etiquetas_actuales_ef), names(etiquetas_actuales_ef))
+nuevas_etiquetas_ef <- c(etiquetas_actuales, "Promedio" = length(etiquetas_actuales_ef))#no necesita sumarse
+df_efectivo$cons_emp <- set_labels(df_efectivo$cons_emp, labels = nuevas_etiquetas_ef)
+
+
+#Promedio campaña
+
+df_efectivo_campaña <- df_efectivo |>
+  filter(
+    lubridate::month(fecha_fin) >= 5,
+    cons_emp != length(nuevas_etiquetas)  # Excluye promedios preexistentes
+  ) |>
+  group_by(cons_emp) |>
+  filter(fecha_fin == max(fecha_fin)) |>  # Última encuesta por consultora
+  ungroup()
+
+
+promedios_efectivo_campaña <- df_efectivo_campaña %>%
+  group_by(candidat) %>%
+  summarise(
+    intencion = mean(intencion, na.rm = TRUE),
+    margen_error_efectivo = mean(margen_error_efectivo, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(cons_emp = length(nuevas_etiquetas_ef),
+         fecha_fin = ceiling_date(max(df_efectivo_campaña$mes_ano), "month") - 1 )  # Valor etiquetado como "Promedio"
+promedios_efectivo_campaña
+
+
+df_efectivo_campaña <- df_efectivo_campaña |>
+  bind_rows(promedios_efectivo_campaña) %>%
+  mutate(
+    cons_emp = set_labels(as.numeric(cons_emp), labels = nuevas_etiquetas),
+    lower_ci = pmax(intencion - margen_error_efectivo, 0),
+    upper_ci = pmin(intencion + margen_error_efectivo, 1)
+  )
+
+df_efectivo_campaña<- df_efectivo_campaña|>
+  mutate(
+    lower_ci = intencion - margen_error_efectivo,
+    upper_ci = intencion + margen_error_efectivo,
+    lower_ci = pmax(lower_ci, 0),
+    upper_ci = pmin(upper_ci, 1)
+  )
+
+df_efectivo_campaña
+
+# 5. Calcular promedios (mismo código, ahora con intención reescalada)
+promedios_efectivo_mes <- df_efectivo %>%
+  group_by(mes_ano, candidat) %>%
+  summarise(
+    intencion = mean(intencion, na.rm = TRUE),
+    margen_error_efectivo = mean(margen_error_efectivo, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(cons_emp = length(nuevas_etiquetas_ef),
+         fecha_fin = ceiling_date(mes_ano, "month") - 1 )  # Valor etiquetado como "Promedio"
+promedios_efectivo_mes
+
+# 6. Combinar conservando etiquetas (igual que tu versión)
+df_efectivo_mes<- bind_rows(df_efectivo, promedios_efectivo_mes) %>%
+  mutate(cons_emp = set_labels(as.numeric(cons_emp), labels = nuevas_etiquetas))
+
+
+# Verificación
+table(df_efectivo_mes$cons_emp)  # Debe incluir 13="Promedio"
+get_labels(df_efectivo$cons_emp)
+
+
+df_efectivo_mes<- df_efectivo_mes|>
+  mutate(
+    lower_ci = intencion - margen_error_efectivo,
+    upper_ci = intencion + margen_error_efectivo,
+    lower_ci = pmax(lower_ci, 0),
+    upper_ci = pmin(upper_ci, 1)
+  )
+
+df_efectivo_mes
+
+colores_10 <- c(
+  "#ffc603",  # KENCHA
+  "#ff6364",  # TUTO
+  "#3dac34",  # ADR
+  "#541a67",  # MRV
+  "brown",  # RPAZ
+  "#01a8ec",  # JF
+  "#002696",  # EDU
+  "#aa1622",  # ADN
+  "#a6761d",
+  "#65dfe8"  # NGP# INDE
+)
+
+####Datos históricos####
+
+df19<-googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1oTCuIIRJ3U5s-w0zUsNQjGHHP8BsRbaZk2pXSMfnHlc/edit?usp=sharing")
+head(df19)
+
+
+df19 <- df19 |>
+  mutate(across(matches("^fecha"), ~ as.Date(as.character(.), format = "%Y-%m-%d")))
+
+df19_long <- df19 %>%
+  pivot_longer(
+    cols = c("MAS-IPSP", "CC", "PDC","BDN", "MTS", "UCS", "PAN-BOL", "MNR", "FPV", "blanco", "nulo", "indeciso/secreto"),
+    names_to = "candidat",
+    values_to = "intencion"
+  )
+head(df19_long)
+
+df19_long <- df19_long %>%
+  mutate(
+    candidat = fct_relevel(
+      candidat,
+      c(
+        setdiff(unique(candidat), c("blanco", "nulo", "indeciso/secreto")),
+        "blanco", "nulo", "indeciso/secreto"
+      )
+    )
+  )|>
+  mutate(
+    lower_ci = intencion - error,
+    upper_ci = intencion + error,
+    lower_ci = pmax(lower_ci, 0),
+    upper_ci = pmin(upper_ci, 1)
+  )|>
+  mutate(
+    cons_emp = fct_relevel(
+      cons_emp, c("UMSA", "CIESMORI","VIA CIENCIA", "IPSOS", "RESULTADOS OFICIALES")
+    ))
+
+
+
+df20<-googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/19RvvNCC4p61jsldLs-uXjFLVPCx0Bz1eWePH1Tz-rjs/edit?usp=sharing")
+head(df20)
+
+
+df20 <- df20 |>
+  mutate(across(matches("^fecha"), ~ as.Date(as.character(.), format = "%Y-%m-%d")))
+
+
+df20_long <- df20 %>%
+  pivot_longer(
+    cols = c("MAS-IPSP", "CC", "CREEMOS", "FPV", "LIBRE-21", "PAN-BOL", "ADN", "blanco", "nulo", "indeciso/secreto"),
+    names_to = "candidat",
+    values_to = "intencion"
+  )
+head(df20_long)
+
+table(df20_long$cons_emp)
+
+df20_long <- df20_long %>%
+  mutate(
+    candidat = fct_relevel(
+      candidat,
+      c(
+        setdiff(unique(candidat), c("blanco", "nulo", "indeciso/secreto")),
+        "blanco", "nulo", "indeciso/secreto"
+      )
+    )
+  )|>
+  mutate(
+    lower_ci = intencion - error,
+    upper_ci = intencion + error,
+    lower_ci = pmax(lower_ci, 0),
+    upper_ci = pmin(upper_ci, 1)
+  )|>
+  mutate(
+    cons_emp = fct_relevel(
+      cons_emp, c("Mercados y Muestras", "UMSA", "CIESMORI", "IPSOS", "RESULTADOS OFICIALES")
+    ))
+
+
+
